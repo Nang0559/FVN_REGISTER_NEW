@@ -178,6 +178,7 @@ builder.Services.AddScoped<IEquipmentService, EquipmentService>();
 builder.Services.AddScoped<IEquipmentImportService, EquipmentImportService>();
 builder.Services.AddScoped<IEquipmentQrCodeService, QrCodeService>();
 builder.Services.AddScoped<IEquipmentInspectionService, EquipmentInspectionService>();
+builder.Services.AddScoped<IEquipmentFormService, EquipmentFormService>();
 
 // Auth / users
 builder.Services.AddScoped<IAuditService, AuditService>();
@@ -242,7 +243,7 @@ builder.Services.AddScoped<IApprovalInboxService, ApprovalInboxService>();
 
 // HRM Sync
 builder.Services.AddScoped<IHrmSourceReader<HrmDepartmentSourceRow>, HrmDepartmentSourceReader>();
-builder.Services.AddScoped<IHrmSourceReader<HrmEmployeeSourceRow>, HrmEmployeeSourceReader>();
+builder.Services.AddScoped<IHrmSourceReader<HrmEmployeeSourceRow>, EmployeeSourceReader>();
 builder.Services.AddScoped<IHrmSourceReader<HrmLeaveTypeSourceRow>, HrmLeaveTypeSourceReader>();
 builder.Services.AddScoped<IHrmSourceReader<HrmPositionSourceRow>, HrmPositionSourceReader>();
 builder.Services.AddScoped<IHrmStagingImporter, DepartmentStagingImporter>();
