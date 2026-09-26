@@ -7,6 +7,7 @@ using FVN_REGISTER.Infrastructure;
 using FVN_REGISTER.Infrastructure.Services.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AppAuthorizationService = FVN_REGISTER.Application.Interfaces.Security.IAuthorizationService;
 
 namespace FVN_REGISTER.API.Controllers;
 
@@ -17,9 +18,9 @@ public sealed class EndpointInventoryController : ControllerBase
 {
     private readonly EndpointInventoryService _service;
     private readonly ICurrentUserService _currentUser;
-    private readonly IAuthorizationService _authorization;
+    private readonly AppAuthorizationService _authorization;
 
-    public EndpointInventoryController(FVNWEBAPPContext db, ICurrentUserService currentUser, IAuthorizationService authorization)
+    public EndpointInventoryController(FVNWEBAPPContext db, ICurrentUserService currentUser, AppAuthorizationService authorization)
     {
         _service = new EndpointInventoryService(db);
         _currentUser = currentUser;
