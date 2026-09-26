@@ -12,15 +12,23 @@ public sealed class F03EquipmentSchemaConfiguration : IEntityTypeConfiguration<F
         b.HasKey(x => x.Id);
         b.Property(x => x.DeptCode).HasMaxLength(20).IsRequired();
         b.Property(x => x.SchemaName).HasMaxLength(150).IsRequired();
+        b.Property(x => x.SchemaKind).HasMaxLength(20).IsRequired();
+        b.Property(x => x.SchemaKey).HasMaxLength(64).IsRequired();
         b.Property(x => x.Version).IsRequired();
         b.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        b.Property(x => x.SourceFileName).HasMaxLength(260);
         b.Property(x => x.IsActive).HasDefaultValue(true);
 
-        b.HasIndex(x => new { x.DeptCode, x.Version })
+        b.HasIndex(x => new { x.DeptCode, x.SchemaKey, x.Version })
             .IsUnique()
-            .HasDatabaseName("UX_F03EquipmentSchemas_Dept_Version");
+            .HasDatabaseName("UX_F03EquipmentSchemas_Dept_SchemaKey_Version");
 
         b.HasIndex(x => new { x.DeptCode, x.Status })
             .HasDatabaseName("IX_F03EquipmentSchemas_Dept_Status");
+
+        b.HasOne(x => x.SourceSchema)
+            .WithMany()
+            .HasForeignKey(x => x.SourceSchemaId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
