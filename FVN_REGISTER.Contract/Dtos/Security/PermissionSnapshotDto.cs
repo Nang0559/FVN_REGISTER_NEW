@@ -21,3 +21,4 @@ public sealed class SecurityFunctionDto
     public string? ScopeCode { get; set; }
     public int DisplayOrder { get; set; }
 }
+
