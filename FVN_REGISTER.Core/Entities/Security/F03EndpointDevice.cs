@@ -10,6 +10,8 @@ public sealed class F03EndpointDevice
     [Required, StringLength(100)] public string DeviceKey { get; set; } = string.Empty;
     [StringLength(255)] public string? ComputerName { get; set; }
     [StringLength(255)] public string? SerialNumber { get; set; }
+    [StringLength(255)] public string? HardwareUuid { get; set; }
+    [StringLength(100)] public string? AgentInstallationId { get; set; }
     [StringLength(255)] public string? OsName { get; set; }
     [StringLength(100)] public string? OsVersion { get; set; }
     [StringLength(50)] public string? EmployeeCode { get; set; }
@@ -17,6 +19,8 @@ public sealed class F03EndpointDevice
     [StringLength(50)] public string? AgentVersion { get; set; }
     public DateTime? LastSeenUtc { get; set; }
     [Required, StringLength(30)] public string Status { get; set; } = "Unknown";
+    [Required, StringLength(30)] public string IdentityStatus { get; set; } = "Verified";
+    [StringLength(128)] public string? LastInventoryHash { get; set; }
     [Required, StringLength(30)] public string Source { get; set; } = "FVNAgent";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
