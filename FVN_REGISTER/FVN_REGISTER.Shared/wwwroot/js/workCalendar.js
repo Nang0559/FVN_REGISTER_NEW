@@ -76,6 +76,19 @@ window.workCalendar = (function () {
                 'fcc-calendar-day-line holiday');
         }
 
+        // Leave registrations use the compact "P" marker from the
+        // self-service calendar convention. Keep the full registration
+        // details below it so status/approval information remains available.
+        const leaveRegistrations = (day.registrations || [])
+            .filter(x => String(x.moduleCode).toUpperCase() === 'LEAVE');
+
+        if (leaveRegistrations.length > 0) {
+            appendLine(
+                body,
+                'P',
+                'fcc-calendar-day-line leave-marker'); 
+        }
+
         if (day.shift) {
             appendLine(
                 body,
@@ -245,12 +258,19 @@ window.workCalendar = (function () {
                 const classes = [];
                 const weekDay = arg.date.getDay();
 
-                if (weekDay === 0 || weekDay === 6) {
-                    classes.push('fc-weekend');
+                if (weekDay === 6) {
+                    classes.push('fcc-saturday');
+                } else if (weekDay === 0) {
+                    classes.push('fcc-sunday');
                 }
 
                 if (day?.holiday) {
                     classes.push('fcc-company-holiday');
+                }
+
+                if ((day?.registrations || []).some(
+                    x => String(x.moduleCode).toUpperCase() === 'LEAVE')) {
+                    classes.push('fcc-leave-day');
                 }
 
                 if (day?.canRegister) {
