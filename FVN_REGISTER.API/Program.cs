@@ -148,6 +148,7 @@ builder.Services.AddScoped<IModuleDashboardProvider, TripDashboardProvider>();
 builder.Services.AddScoped<IModuleDashboardProvider, EquipmentDashboardProvider>();
 builder.Services.AddScoped<ILeaveQueryService, LeaveQueryService>();
 builder.Services.AddScoped<IEscalationRuleService, EscalationRuleService>();
+builder.Services.AddScoped<ILeaveValidator, LeaveValidator>();
 builder.Services.AddScoped<ILeaveEscalationService, LeaveEscalationService>();
 builder.Services.AddScoped<ILeaveService, LeaveService>();
 builder.Services.AddScoped<ILeaveEntitlementService, LeaveEntitlementService>();
@@ -158,7 +159,7 @@ builder.Services.AddScoped<IReportService, OTReportService>();
 builder.Services.AddScoped<IReportService, OperationalReportService>();
 builder.Services.AddScoped<IReportDispatcher, ReportDispatcher>();
 
-// OT / Payroll
+// OT
 builder.Services.AddScoped<IOTQueryService, OTQueryService>();
 builder.Services.AddScoped<IOTValidator, OTValidator>();
 builder.Services.AddScoped<IOTService, OTService>();
@@ -214,8 +215,7 @@ builder.Services.AddScoped<IEmailTemplateManagementService, EmailTemplateManagem
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
 
-// Approval: existing Leave/OT/Trip/Equipment flows are unchanged. Payroll is an
-// additional module on the same engine and is only activated after payroll lock.
+// Approval: provider -> engine -> workflow -> cross-module inbox/resolver
 builder.Services.AddScoped<LeaveApprovalProvider>();
 builder.Services.AddScoped<OTApprovalProvider>();
 builder.Services.AddScoped<TripApprovalProvider>();
@@ -260,3 +260,59 @@ builder.Services.AddScoped<IHrmSyncReviewQueryService, HrmSyncReviewQueryService
 builder.Services.AddScoped<IHrmSyncService, HrmSyncService>();
 builder.Services.AddScoped<IHrmAttendanceCalculationService, HrmAttendanceCalculationService>();
 builder.Services.AddScoped<IHrmAttendanceExcelExportService, HrmAttendanceExcelExportService>();
+builder.Services.AddScoped<IHrmUserRoleRuleService, HrmUserRoleRuleService>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.MapInboundClaims = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true, ValidIssuer = jwtOptions.Issuer,
+        ValidateAudience = true, ValidAudience = jwtOptions.Audience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
+        ValidateLifetime = true, ClockSkew = TimeSpan.FromMinutes(5),
+        NameClaimType = "name", RoleClaimType = "role"
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            if (!context.HttpContext.Request.Path.StartsWithSegments("/hubs")) return Task.CompletedTask;
+            var qs = context.Request.Query["access_token"].ToString();
+            if (!string.IsNullOrEmpty(qs)) { context.Token = qs; return Task.CompletedTask; }
+            var header = context.Request.Headers["Authorization"].ToString();
+            if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) context.Token = header["Bearer ".Length..];
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.AddAuthorization();
+builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    var feature = context.Features.Get<IExceptionHandlerFeature>();
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    context.Response.ContentType = "application/json";
+    await context.Response.WriteAsJsonAsync(new { message = feature?.Error.Message ?? "Unexpected error." });
+}));
+app.UseHttpsRedirection();
+app.UseCors("FccCorsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapHub<NotificationHub>("/hubs/notifications");
+
+app.Run();
