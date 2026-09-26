@@ -80,6 +80,7 @@ Run from the repository SQL directory with SSMS Query -> SQLCMD Mode enabled.
 :r "$(RepoRoot)\50_EquipmentManageCapability.sql"
 :r "$(RepoRoot)\51_SecurityFunctionRegistryRecovery.sql"
 :r "$(RepoRoot)\52_Verify_SecurityFunctionRecovery.sql"
+:r "$(RepoRoot)\53_ApprovalUnifiedFoundation.sql"
 
 :r "$(RepoRoot)\99_Verify.sql"
 
