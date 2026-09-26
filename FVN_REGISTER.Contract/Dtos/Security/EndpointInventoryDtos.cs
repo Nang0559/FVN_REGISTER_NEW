@@ -20,6 +20,8 @@ public sealed record EndpointInventoryRequestDto(
     string DeviceKey,
     string? ComputerName,
     string? SerialNumber,
+    string? HardwareUuid,
+    string? AgentInstallationId,
     string? OsName,
     string? OsVersion,
     string? EmployeeCode,
