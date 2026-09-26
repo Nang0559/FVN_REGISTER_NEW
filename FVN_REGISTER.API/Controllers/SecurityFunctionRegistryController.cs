@@ -1,10 +1,12 @@
 using FVN_REGISTER.Application.Interfaces.Auths;
 using FVN_REGISTER.Application.Interfaces.Security;
+using AppAuthorizationService = FVN_REGISTER.Application.Interfaces.Security.IAuthorizationService;
 using FVN_REGISTER.Application.Interfaces.Users;
 using FVN_REGISTER.Contract.Dtos.Security;
 using FVN_REGISTER.Contract.Responses;
 using FVN_REGISTER.Core.Constants;
 using FVN_REGISTER.Infrastructure.Services.Security;
+using FVN_REGISTER.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -18,12 +20,12 @@ public sealed class SecurityFunctionRegistryController : BaseApiController
 {
     private readonly SecurityFunctionRegistryService _registry;
     private readonly SecurityWebManifestService _webManifest;
-    private readonly IAuthorizationService _authorization;
+    private readonly AppAuthorizationService _authorization;
 
     public SecurityFunctionRegistryController(
         SecurityFunctionRegistryService registry,
         FVNWEBAPPContext db,
-        IAuthorizationService authorization,
+        AppAuthorizationService authorization,
         ICurrentUserService currentUser,
         IUserLogService userLog,
         ILogger<SecurityFunctionRegistryController> logger,
