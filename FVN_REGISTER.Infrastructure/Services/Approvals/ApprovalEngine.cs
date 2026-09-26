@@ -35,10 +35,23 @@ public class ApprovalEngine<TSubject> : IApprovalEngine<TSubject>
     public async Task InitializeStepsAsync(
         int requestId, ApprovalSnapshotDto snapshot, CancellationToken ct)
     {
+        var existing = await _uow.Repository<F03ApprovalSnapshot>()
+            .Query()
+            .FirstOrDefaultAsync(
+                s => s.RequestId == requestId && s.RequestType == Module, ct);
+
+        if (existing != null)
+        {
+            // Approval initialization is idempotent. A request must never receive a
+            // second live snapshot because a retry was triggered after a timeout.
+            return;
+        }
+
         var entity = new F03ApprovalSnapshot
         {
             RequestId = requestId,
             RequestType = Module,
+            RequesterEmployeeCode = snapshot.RequesterEmployeeCode,
             CreatedAt = snapshot.CapturedAt,
             Steps = snapshot.Steps
                 .OrderBy(s => s.Level)
@@ -134,9 +147,6 @@ public class ApprovalEngine<TSubject> : IApprovalEngine<TSubject>
                 await _provider.NotifyStepCompletedAsync(
                     subject, completedStep, isFullyApproved, ct);
 
-                // Normal approval activates the next snapshot step. The activation has
-                // exactly the same email + in-app semantics as escalation. This prevents
-                // a request from becoming Pending at level N+1 without notifying its owner.
                 if (!action.IsReject && !isFullyApproved)
                     await NotifyNextApproverAsync(requestId, subject, ct);
             }
@@ -200,8 +210,7 @@ public class ApprovalEngine<TSubject> : IApprovalEngine<TSubject>
 
         foreach (var snapshot in snapshots)
         {
-            var myStep = snapshot.Steps.FirstOrDefault(
-                s => s.ApproverCode == approverCode);
+            var myStep = snapshot.Steps.FirstOrDefault(s => s.ApproverCode == approverCode);
             if (myStep == null) continue;
 
             var calculated = await GetStepsAsync(snapshot.RequestId, ct);
@@ -216,9 +225,6 @@ public class ApprovalEngine<TSubject> : IApprovalEngine<TSubject>
             var subject = await _provider.GetSubjectAsync(snapshot.RequestId, ct);
             if (subject == null) continue;
 
-            // The request status is the source of truth for cancellation/terminal
-            // state. Never expose a snapshot step as pending when the request itself
-            // is no longer active.
             if (subject.OverallStatus is not
                 (ApprovalStatus.Pending
                 or ApprovalStatus.InProgress
@@ -264,25 +270,17 @@ public class ApprovalEngine<TSubject> : IApprovalEngine<TSubject>
 
         if (snapshot == null) return null;
 
-        var calculated = await GetStepsAsync(requestId, ct);
-        var next = calculated
+        var histories = await _uow.Repository<F03ApprovalHistory>()
+            .Query()
+            .Where(h => h.RequestId == requestId && h.RequestType == Module)
+            .ToListAsync(ct);
+
+        var steps = ApprovalStepMapper.MapToList(snapshot.Steps, histories);
+        return steps
             .Where(s => s.IsRequired && s.Decision == DecisionType.Pending)
             .OrderBy(s => s.Level)
-            .FirstOrDefault();
-
-        if (next == null) return null;
-
-        var snapshotStep = snapshot.Steps.FirstOrDefault(s => s.Level == next.Level);
-        if (snapshotStep == null) return null;
-
-        return new ApprovalStepDto
-        {
-            Level = snapshotStep.Level,
-            RoleName = snapshotStep.RoleName,
-            ApproverCode = snapshotStep.ApproverCode,
-            ApproverName = snapshotStep.ApproverName,
-            ApproverEmail = snapshotStep.ApproverEmail,
-            IsRequired = snapshotStep.IsRequired
-        };
+            .FirstOrDefault(s => steps
+                .Where(p => p.Level < s.Level && p.IsRequired)
+                .All(p => p.Decision == DecisionType.Approved));
     }
 }
