@@ -7,6 +7,9 @@ public sealed class F03EquipmentRequest : BaseRequestEntity
 {
     public EquipmentRequestKind RequestKind { get; set; }
     public int? AssetId { get; set; }
+    public int? FormId { get; set; }
+    public int? FormSubmissionId { get; set; }
+    [StringLength(50)] public string? FormCode { get; set; }
     [Required, StringLength(50)] public string SelectedApproverCode { get; set; } = string.Empty;
     [Required, StringLength(128)] public string QrToken { get; set; } = string.Empty;
     public int OperatorUserId { get; set; }
@@ -31,7 +34,6 @@ public sealed class F03EquipmentRequest : BaseRequestEntity
     public int? RepairAssigneeUserId { get; set; }
     [StringLength(1000)] public string? RepairFeedback { get; set; }
     public DateTime? RepairCompletedAt { get; set; }
-
 
     public F03EquipmentAsset? Asset { get; set; }
 }
