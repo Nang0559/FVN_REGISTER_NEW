@@ -9,6 +9,7 @@ public sealed class F03PublicFormSubmission : BaseAuditEntity
 {
     public int FormId { get; set; }
     [Required, StringLength(50)] public string EmployeeCode { get; set; } = string.Empty;
+    public int? EquipmentAssetId { get; set; }
     public DateTime SubmittedAt { get; set; }
     [Required, StringLength(20)] public string Status { get; set; } = "Submitted";
     public int FormVersion { get; set; } = 1;
