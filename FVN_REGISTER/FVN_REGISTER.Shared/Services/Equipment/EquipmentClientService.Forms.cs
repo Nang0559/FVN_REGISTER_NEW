@@ -1,4 +1,5 @@
 using FVN_REGISTER.Contract.Dtos.EquipmentForms;
+using FVN_REGISTER.Contract.Dtos.PublicForms;
 using FVN_REGISTER.Contract.Responses;
 
 namespace FVN_REGISTER.Shared.Services.Equipment;
@@ -10,6 +11,9 @@ public sealed partial class EquipmentClientService
 
     public Task<ApiResponse<List<EquipmentFormAssignmentDto>>> GetEquipmentFormAssignmentsAsync(string equipmentSchemaKey, CancellationToken ct = default)
         => Get<List<EquipmentFormAssignmentDto>>($"api/equipment/forms/assignments/{Uri.EscapeDataString(equipmentSchemaKey)}", "equipment form assignments", ct);
+
+    public Task<ApiResponse<List<PublicFormDto>>> GetEquipmentFormCatalogAsync(CancellationToken ct = default)
+        => Get<List<PublicFormDto>>("api/equipment/forms/catalog", "equipment form catalog", ct);
 
     public Task<ApiResponse<EquipmentFormAssignmentDto>> AssignEquipmentFormAsync(EquipmentFormAssignmentRequest request, CancellationToken ct = default)
         => Post<EquipmentFormAssignmentDto>("api/equipment/forms/assignments", request, "assign equipment form", ct);
