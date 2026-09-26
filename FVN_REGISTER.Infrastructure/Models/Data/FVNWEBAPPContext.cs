@@ -118,6 +118,13 @@ public class FVNWEBAPPContext : DbContext
     public DbSet<VF03LeaveRequest> VF03LeaveRequests { get; set; }
     public DbSet<VF03LeaveRequestDetail> VF03LeaveRequestDetails { get; set; }
     public DbSet<VF03leaveType> VF03LeaveTypes { get; set; }
+    public DbSet<VF03OTRequest> VF03OTRequests { get; set; }
+    public DbSet<VF03OTRequestDetail> VF03OTRequestDetails { get; set; }
+    public DbSet<VF03OTSummary> VF03OTSummaries { get; set; }
+    public DbSet<VF03LeaveBalance> VF03LeaveBalances { get; set; }
+    public DbSet<VF03user> VF03Users { get; set; }
+    public DbSet<VwCurrentlyPresentEmployee> VwCurrentlyPresentEmployees { get; set; }
+    public DbSet<VwShiftCheckInOut> VwShiftCheckInOuts { get; set; }
     public DbSet<F03EndpointDevice> EndpointDevices { get; set; }
     public DbSet<F03EndpointSoftwareInventory> EndpointSoftwareInventory { get; set; }
     public DbSet<F03EndpointServiceInventory> EndpointServiceInventory { get; set; }
@@ -126,5 +133,51 @@ public class FVNWEBAPPContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        modelBuilder.Entity<VwShiftCheckInOut>(entity => { entity.HasNoKey(); entity.ToView("VwShiftCheckInOut"); });
+        modelBuilder.Entity<F03EndpointDevice>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.DeviceKey).IsUnique();
+            entity.HasIndex(x => x.SerialNumber);
+            entity.HasIndex(x => x.EquipmentAssetId);
+            entity.HasIndex(x => x.LastSeenUtc);
+            entity.HasMany(x => x.Software).WithOne().HasForeignKey(x => x.EndpointDeviceId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Services).WithOne().HasForeignKey(x => x.EndpointDeviceId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<F03EndpointSoftwareInventory>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.EndpointDeviceId, x.NormalizedName }); });
+        modelBuilder.Entity<F03EndpointServiceInventory>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.EndpointDeviceId, x.ServiceName }); });
+        modelBuilder.Entity<F03StagingEmployee>().Property(x => x.TotalLeaveDays).HasPrecision(10, 2);
+        modelBuilder.Entity<F03StagingOTType>().Property(x => x.RateMultiplier).HasPrecision(10, 2);
+        modelBuilder.Entity<F03PayrollInput>(entity => { entity.Property(x => x.WorkMinutes).HasPrecision(10, 2); entity.Property(x => x.LeaveTotal).HasPrecision(10, 2); entity.Property(x => x.OTMinutes).HasPrecision(10, 2); });
+        modelBuilder.Entity<F03PublicFormAnswer>().Property(x => x.NumberValue).HasPrecision(18, 4);
+        modelBuilder.Entity<F03HrmAttendanceCalculated>(entity => { entity.HasKey(x => x.Id); entity.ToTable("F03HrmAttendanceCalculated"); entity.Property(x => x.WorkDate).HasColumnType("date"); entity.Property(x => x.EmployeeCode).HasMaxLength(50); entity.Property(x => x.DeptCode).HasMaxLength(20); entity.Property(x => x.FullName).HasMaxLength(200); entity.Property(x => x.ShiftAbbr).HasMaxLength(10); });
+        modelBuilder.Entity<F03OTLimitRule>(entity => { entity.Property(x => x.LimitType).HasConversion<string>().HasMaxLength(40); });
+        modelBuilder.Entity<F03PublicForm>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => x.FormCode).IsUnique(); entity.HasMany(x => x.Questions).WithOne().HasForeignKey(x => x.FormId).OnDelete(DeleteBehavior.Cascade); entity.HasMany(x => x.Audiences).WithOne().HasForeignKey(x => x.FormId).OnDelete(DeleteBehavior.Cascade); });
+        modelBuilder.Entity<F03PublicFormQuestion>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.FormId, x.QuestionCode }).IsUnique(); entity.HasMany(x => x.Options).WithOne().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Cascade); });
+        modelBuilder.Entity<F03PublicFormQuestionOption>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.QuestionId, x.OptionCode }).IsUnique(); });
+        modelBuilder.Entity<F03PublicFormAudience>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.FormId, x.ScopeType, x.ScopeValue }); });
+        modelBuilder.Entity<F03PublicFormSubmission>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.FormId, x.EmployeeCode, x.Status }); entity.HasMany(x => x.Answers).WithOne().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Cascade); });
+        modelBuilder.Entity<F03PublicFormAnswer>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.SubmissionId, x.QuestionId }).IsUnique(); });
+        modelBuilder.Entity<F03Position>(entity => { entity.HasKey(x => x.Id); entity.Property(x => x.PositionCode).IsRequired().HasMaxLength(20); entity.HasIndex(x => x.PositionCode).IsUnique(); });
+        modelBuilder.Entity<F03ApprovalPolicy>(entity => { entity.HasKey(x => x.Id); entity.Property(x => x.PositionCode).IsRequired().HasMaxLength(20); entity.HasIndex(x => new { x.RequestType, x.PositionCode, x.Level }).IsUnique(); entity.HasOne<F03Position>().WithMany().HasForeignKey(x => x.PositionCode).HasPrincipalKey(x => x.PositionCode).OnDelete(DeleteBehavior.Restrict); });
+        modelBuilder.Entity<F03ApprovalSelection>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.RequestType, x.RequestId, x.Level }).IsUnique(); });
+        modelBuilder.Entity<F03RoleFunction>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.IdRole, x.IdFunction }).IsUnique(); entity.HasOne(x => x.Role).WithMany(x => x.RoleFunctions).HasForeignKey(x => x.IdRole).OnDelete(DeleteBehavior.Cascade); entity.HasOne(x => x.Function).WithMany(x => x.RoleFunctions).HasForeignKey(x => x.IdFunction).OnDelete(DeleteBehavior.Cascade); });
+        modelBuilder.Entity<F03UserRole>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.IdUser, x.IdRole }).IsUnique(); entity.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.IdUser).OnDelete(DeleteBehavior.Cascade); entity.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.IdRole).OnDelete(DeleteBehavior.Cascade); });
+        modelBuilder.Entity<F03Role>(entity => entity.HasIndex(x => x.RoleCode).IsUnique());
+        modelBuilder.Entity<F03FeatureOperatorAssignment>(entity => { entity.HasKey(x => x.Id); entity.Property(x => x.EmployeeCode).HasMaxLength(50).IsRequired(); entity.Property(x => x.ResourceType).HasMaxLength(50).IsRequired(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.EmployeeCode }).IsUnique(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.IsActive }); });
+        modelBuilder.Entity<F03EmailDispatchPolicy>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.TemplateCode, x.Priority }).IsUnique(); entity.Property(x => x.DispatchMode).HasConversion<string>().HasMaxLength(30); });
+        modelBuilder.Entity<F03SecurityFunctionRegistryItem>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => x.FunctionKey).IsUnique(); entity.Property(x => x.FunctionKey).IsRequired().HasMaxLength(150); entity.Property(x => x.LifecycleStatus).IsRequired().HasMaxLength(30); entity.Property(x => x.SourceType).IsRequired().HasMaxLength(30); entity.Property(x => x.DefinitionHash).IsRequired().HasMaxLength(128); });
+        modelBuilder.Entity<F03Function>(entity => { entity.HasIndex(x => x.FunctionKey).IsUnique(); });
+    }
+
+    public override int SaveChanges() { ApplyAuditInfo(); return base.SaveChanges(); }
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) { ApplyAuditInfo(); return base.SaveChangesAsync(cancellationToken); }
+    private void ApplyAuditInfo()
+    {
+        foreach (var entry in ChangeTracker.Entries<BaseAuditEntity>())
+        {
+            if (entry.State == EntityState.Added) entry.Entity.CreatedAt = DateTime.Now;
+            else if (entry.State == EntityState.Modified) entry.Entity.ModifiedAt = DateTime.Now;
+        }
     }
 }
