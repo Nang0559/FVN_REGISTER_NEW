@@ -22,13 +22,3 @@ public sealed class SecurityFunctionDto
     public int DisplayOrder { get; set; }
 }
 
-public sealed class SecurityRoleDto
-{
-    public int IdRole { get; set; }
-    public int RoleCode { get; set; }
-    public string RoleName { get; set; } = string.Empty;
-    public string? Detail { get; set; }
-    public bool IsSystem { get; set; }
-    public bool IsActive { get; set; }
-    public List<int> FunctionCodes { get; set; } = new();
-}
