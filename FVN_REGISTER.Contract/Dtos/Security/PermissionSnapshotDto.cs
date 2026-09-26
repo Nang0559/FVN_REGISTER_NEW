@@ -3,6 +3,7 @@ namespace FVN_REGISTER.Contract.Dtos.Security;
 public sealed class PermissionSnapshotDto
 {
     public int UserId { get; set; }
+    public int? PermissionCode { get; set; }
     public List<int> RoleCodes { get; set; } = new();
     public List<SecurityFunctionDto> Functions { get; set; } = new();
     public HashSet<int> FunctionCodes { get; set; } = new();
