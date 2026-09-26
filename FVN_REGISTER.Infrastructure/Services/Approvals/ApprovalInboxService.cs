@@ -54,7 +54,6 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
         {
             try
             {
-                // Scoped workflows share one DbContext; keep reads sequential.
                 var byModule = new Dictionary<RequestModule, List<PendingApprovalItemDto>>
                 {
                     [RequestModule.Leave] = await _leaveWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct),
@@ -73,7 +72,7 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                         RequestModule.Overtime => SecurityFunctionCodes.OTApprove,
                         RequestModule.Trip => SecurityFunctionCodes.TripApprove,
                         RequestModule.Equipment => SecurityFunctionCodes.EquipmentApprove,
-                        RequestModule.Payroll => SecurityFunctionCodes.PayrollApprove,
+                        RequestModule.Payroll => ApprovalSecurityFunctionCodes.PayrollApprove,
                         _ => 0
                     };
                     if (functionCode == 0) continue;
@@ -81,19 +80,16 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                     var scopedItems = new List<PendingApprovalItemDto>();
                     foreach (var item in pair.Value)
                     {
-                        var policyAllows = await _approvalPolicies.CanApproveAsync(
-                            pair.Key, item.EmployeeCode, user.EmployeeCode ?? string.Empty,
-                            GetCurrentLevel(item), ct);
-
-                        if (policyAllows && await _authorization.CanAccessAsync(
-                            user, functionCode, item.EmployeeCode, item.DeptCode, ct))
+                        var policyAllows = await _approvalPolicies.CanApproveAsync(pair.Key, item.EmployeeCode,
+                            user.EmployeeCode ?? string.Empty, GetCurrentLevel(item), ct);
+                        if (policyAllows && await _authorization.CanAccessAsync(user, functionCode,
+                            item.EmployeeCode, item.DeptCode, ct))
                             scopedItems.Add(item);
                     }
                     scopedByModule[pair.Key] = scopedItems;
                 }
 
-                return ServiceResult<List<PendingApprovalGroupDto>>.Ok(
-                    _groupingPolicy.BuildGroups(scopedByModule));
+                return ServiceResult<List<PendingApprovalGroupDto>>.Ok(_groupingPolicy.BuildGroups(scopedByModule));
             }
             catch (Exception ex)
             {
@@ -108,7 +104,6 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             {
                 var validation = await ValidateRequestedItemsAsync(ids, kind, level, user, ct);
                 if (!validation.Success) return validation;
-
                 var action = BuildActionDto(ids.Distinct().ToList(), kind, level, comment, false, user);
                 var result = kind switch
                 {
@@ -119,7 +114,6 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                     RequestModule.Payroll => await _payrollWorkflow.ApproveAsync(action, ct),
                     _ => throw new NotSupportedException($"Module {kind} chưa được hỗ trợ ở Inbox.")
                 };
-
                 if (result.Success)
                 {
                     await _audit.LogAction("APPROVAL_APPROVED", user.UserId,
@@ -144,7 +138,6 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             {
                 var validation = await ValidateRequestedItemsAsync(ids, kind, level, user, ct);
                 if (!validation.Success) return validation;
-
                 var action = BuildActionDto(ids.Distinct().ToList(), kind, level, comment, true, user);
                 var result = kind switch
                 {
@@ -155,7 +148,6 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                     RequestModule.Payroll => await _payrollWorkflow.RejectAsync(action, ct),
                     _ => throw new NotSupportedException($"Module {kind} chưa được hỗ trợ ở Inbox.")
                 };
-
                 if (result.Success)
                 {
                     await _audit.LogAction("APPROVAL_REJECTED", user.UserId,
@@ -176,18 +168,14 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
         {
             var normalizedIds = ids.Distinct().Where(x => x > 0).ToList();
             if (normalizedIds.Count == 0) return ServiceResult.Fail("Không có đơn hợp lệ được chọn.");
-
             var pending = await GetPendingAsync(user, ct);
             if (!pending.Success || pending.Data == null)
                 return ServiceResult.Fail(pending.Message ?? "Không thể xác thực phạm vi phê duyệt.");
-
             var allowed = pending.Data.SelectMany(x => x.Requests)
                 .Where(x => x.Kind == kind && x.CanApprove && GetCurrentLevel(x) == level)
                 .Select(x => x.RequestId).ToHashSet();
-
             if (normalizedIds.Any(id => !allowed.Contains(id)))
                 return ServiceResult.Fail("Một hoặc nhiều đơn không thuộc phạm vi phê duyệt của tài khoản hiện tại hoặc đã thay đổi trạng thái.");
-
             return ServiceResult.Ok();
         }
 
