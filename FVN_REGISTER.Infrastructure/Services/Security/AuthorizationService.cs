@@ -562,14 +562,14 @@ public sealed class AuthorizationService : BaseService<AuthorizationService>, IA
             select new { rf.IdRole, f.FunctionCode }
         ).ToListAsync(ct);
 
-        return roles.Select(r => new SecurityRoleDto
+        return roles.Select(r => new SecurityRoleDto(
+            r.Id,
+            r.RoleCode,
+            r.RoleName,
+            r.Detail,
+            r.IsSystem,
+            r.IsActive == true)
         {
-            IdRole = r.Id,
-            RoleCode = r.RoleCode,
-            RoleName = r.RoleName,
-            Detail = r.Detail,
-            IsSystem = r.IsSystem,
-            IsActive = r.IsActive == true,
             FunctionCodes = map.Where(x => x.IdRole == r.Id)
                 .Select(x => x.FunctionCode).Distinct().OrderBy(x => x).ToList()
         }).ToList();
