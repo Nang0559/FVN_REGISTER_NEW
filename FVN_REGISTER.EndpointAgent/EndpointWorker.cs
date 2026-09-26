@@ -68,6 +68,8 @@ public sealed class EndpointWorker : BackgroundService
             _options.DeviceKey.Trim(),
             Environment.MachineName,
             GetSerialNumber(),
+            GetHardwareIdentity(),
+            GetAgentInstallationId(),
             OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.OSDescription,
             Environment.OSVersion.VersionString,
             null,
@@ -78,7 +80,6 @@ public sealed class EndpointWorker : BackgroundService
 
         using var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(_options.ApiBaseUrl.TrimEnd('/') + "/");
-        client.DefaultRequestHeaders.Add("X-FVN-Device-Key", request.DeviceKey);
         client.DefaultRequestHeaders.Add("X-FVN-Device-Api-Key", apiKey);
 
         using var response = await client.PostAsJsonAsync("api/security/endpoints/inventory", request, cancellationToken);
@@ -99,6 +100,43 @@ public sealed class EndpointWorker : BackgroundService
         catch
         {
             return null;
+        }
+    }
+
+    private static string? GetHardwareIdentity()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS");
+            var manufacturer = key?.GetValue("SystemManufacturer")?.ToString()?.Trim();
+            var product = key?.GetValue("SystemProductName")?.ToString()?.Trim();
+            return string.IsNullOrWhiteSpace(manufacturer) || string.IsNullOrWhiteSpace(product)
+                ? null
+                : $"{manufacturer}|{product}";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string GetAgentInstallationId()
+    {
+        const string path = @"SOFTWARE\FVN_REGISTER\EndpointAgent";
+        const string valueName = "InstallationId";
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(path, writable: true);
+            var existing = key?.GetValue(valueName)?.ToString();
+            if (!string.IsNullOrWhiteSpace(existing)) return existing;
+            var id = Guid.NewGuid().ToString("N");
+            key?.SetValue(valueName, id, Microsoft.Win32.RegistryValueKind.String);
+            return id;
+        }
+        catch
+        {
+            // The server still authenticates the endpoint by its provisioned credential.
+            return Environment.MachineName;
         }
     }
 }
