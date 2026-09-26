@@ -6,6 +6,7 @@ public sealed class PermissionSnapshotDto
     public List<int> RoleCodes { get; set; } = new();
     public List<SecurityFunctionDto> Functions { get; set; } = new();
     public HashSet<int> FunctionCodes { get; set; } = new();
+    public bool IsSuperAdmin { get; set; }
 
     public bool Has(int functionCode) => FunctionCodes.Contains(functionCode);
 }
@@ -21,4 +22,3 @@ public sealed class SecurityFunctionDto
     public string? ScopeCode { get; set; }
     public int DisplayOrder { get; set; }
 }
-
