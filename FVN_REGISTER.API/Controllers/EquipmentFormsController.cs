@@ -26,7 +26,7 @@ public sealed class EquipmentFormsController : ControllerBase
     public async Task<IActionResult> Assign([FromBody] EquipmentFormAssignmentRequest request, CancellationToken ct)
         => ToResponse(await _service.AssignAsync(request, ct));
 
-    [HttpDelete("assignments/{id:int}")]
+    [HttpPost("assignments/{id:int}/remove")]
     public async Task<IActionResult> RemoveAssignment(int id, CancellationToken ct)
         => ToResponse(await _service.RemoveAssignmentAsync(id, ct));
 
