@@ -41,6 +41,7 @@ BEGIN
     CREATE TABLE dbo.F03EquipmentImportBatches
     (
         Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_F03EquipmentImportBatches PRIMARY KEY,
+        SchemaId INT NULL,
         DeptCode NVARCHAR(20) NOT NULL,
         FileName NVARCHAR(260) NOT NULL,
         Status NVARCHAR(30) NOT NULL,
@@ -57,6 +58,8 @@ BEGIN
         LastModifiedSource NVARCHAR(100) NULL
     );
 END
+ELSE IF COL_LENGTH(N'dbo.F03EquipmentImportBatches', N'SchemaId') IS NULL
+    ALTER TABLE dbo.F03EquipmentImportBatches ADD SchemaId INT NULL;
 GO
 
 IF OBJECT_ID(N'dbo.F03EquipmentImportRows', N'U') IS NULL
@@ -88,18 +91,19 @@ GO
 IF NOT EXISTS (SELECT 1 FROM dbo.F03Functions WHERE FunctionCode=2306)
 BEGIN
     INSERT dbo.F03Functions(FunctionCode,FunctionName,Detail,ModuleCode,ActionCode,ScopeCode,DisplayOrder)
-    VALUES(2306,N'Equipment.Import',N'Import thiết bị từ Excel',N'Equipment',N'Import',N'Department',360);
+    VALUES(2306,N'Equipment.Import',N'Nhập dữ liệu thiết bị từ Excel',N'Equipment',N'Import',N'Department',360);
 END
 ELSE
 BEGIN
     UPDATE dbo.F03Functions
-    SET FunctionName=N'Equipment.Import',Detail=N'Import thiết bị từ Excel',ModuleCode=N'Equipment',ActionCode=N'Import',ScopeCode=N'Department',DisplayOrder=360
+    SET FunctionName=N'Equipment.Import',Detail=N'Nhập dữ liệu thiết bị từ Excel',ModuleCode=N'Equipment',ActionCode=N'Import',ScopeCode=N'Department',DisplayOrder=360
     WHERE FunctionCode=2306;
 END
 GO
 
 /* Admin/SuperAdmin and Equipment approvers receive the import capability.
-   Existing security data is not overwritten except this additive capability. */
+   SuperAdmin can additionally grant the function to specific users through
+   Security Center / User Function. */
 INSERT dbo.F03RoleFunctions(IdRole,IdFunction)
 SELECT r.Id,f.Id
 FROM dbo.F03Roles r CROSS JOIN dbo.F03Functions f
