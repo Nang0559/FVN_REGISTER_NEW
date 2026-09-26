@@ -67,10 +67,8 @@ using FVN_REGISTER.Infrastructure.Services.Dashboards;
 using FVN_REGISTER.Infrastructure.Services.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-
 using System.Text;
 using FVN_REGISTER.Application.Configuration;
 using FVN_REGISTER.Infrastructure;
@@ -150,7 +148,6 @@ builder.Services.AddScoped<IModuleDashboardProvider, TripDashboardProvider>();
 builder.Services.AddScoped<IModuleDashboardProvider, EquipmentDashboardProvider>();
 builder.Services.AddScoped<ILeaveQueryService, LeaveQueryService>();
 builder.Services.AddScoped<IEscalationRuleService, EscalationRuleService>();
-builder.Services.AddScoped<ILeaveValidator, LeaveValidator>();
 builder.Services.AddScoped<ILeaveEscalationService, LeaveEscalationService>();
 builder.Services.AddScoped<ILeaveService, LeaveService>();
 builder.Services.AddScoped<ILeaveEntitlementService, LeaveEntitlementService>();
@@ -161,7 +158,7 @@ builder.Services.AddScoped<IReportService, OTReportService>();
 builder.Services.AddScoped<IReportService, OperationalReportService>();
 builder.Services.AddScoped<IReportDispatcher, ReportDispatcher>();
 
-// OT
+// OT / Payroll
 builder.Services.AddScoped<IOTQueryService, OTQueryService>();
 builder.Services.AddScoped<IOTValidator, OTValidator>();
 builder.Services.AddScoped<IOTService, OTService>();
@@ -217,23 +214,28 @@ builder.Services.AddScoped<IEmailTemplateManagementService, EmailTemplateManagem
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
 
-// Approval: provider -> engine -> workflow -> cross-module inbox/resolver
+// Approval: existing Leave/OT/Trip/Equipment flows are unchanged. Payroll is an
+// additional module on the same engine and is only activated after payroll lock.
 builder.Services.AddScoped<LeaveApprovalProvider>();
 builder.Services.AddScoped<OTApprovalProvider>();
 builder.Services.AddScoped<TripApprovalProvider>();
 builder.Services.AddScoped<EquipmentApprovalProvider>();
+builder.Services.AddScoped<PayrollApprovalProvider>();
 builder.Services.AddScoped<IApprovalProvider<LeaveRequestSubject>>(sp => sp.GetRequiredService<LeaveApprovalProvider>());
 builder.Services.AddScoped<IApprovalProvider<OTRequestSubject>>(sp => sp.GetRequiredService<OTApprovalProvider>());
 builder.Services.AddScoped<IApprovalProvider<TripRequestSubject>>(sp => sp.GetRequiredService<TripApprovalProvider>());
 builder.Services.AddScoped<IApprovalProvider<EquipmentRequestSubject>>(sp => sp.GetRequiredService<EquipmentApprovalProvider>());
+builder.Services.AddScoped<IApprovalProvider<PayrollPeriodSubject>>(sp => sp.GetRequiredService<PayrollApprovalProvider>());
 builder.Services.AddScoped<IApprovalEngine<LeaveRequestSubject>, ApprovalEngine<LeaveRequestSubject>>();
 builder.Services.AddScoped<IApprovalEngine<OTRequestSubject>, ApprovalEngine<OTRequestSubject>>();
 builder.Services.AddScoped<IApprovalEngine<TripRequestSubject>, ApprovalEngine<TripRequestSubject>>();
 builder.Services.AddScoped<IApprovalEngine<EquipmentRequestSubject>, ApprovalEngine<EquipmentRequestSubject>>();
+builder.Services.AddScoped<IApprovalEngine<PayrollPeriodSubject>, ApprovalEngine<PayrollPeriodSubject>>();
 builder.Services.AddScoped<IApprovalWorkflowOrchestrator<LeaveRequestSubject>, ApprovalWorkflowOrchestrator<LeaveRequestSubject>>();
 builder.Services.AddScoped<IApprovalWorkflowOrchestrator<OTRequestSubject>, ApprovalWorkflowOrchestrator<OTRequestSubject>>();
 builder.Services.AddScoped<IApprovalWorkflowOrchestrator<TripRequestSubject>, ApprovalWorkflowOrchestrator<TripRequestSubject>>();
 builder.Services.AddScoped<IApprovalWorkflowOrchestrator<EquipmentRequestSubject>, ApprovalWorkflowOrchestrator<EquipmentRequestSubject>>();
+builder.Services.AddScoped<IApprovalWorkflowOrchestrator<PayrollPeriodSubject>, ApprovalWorkflowOrchestrator<PayrollPeriodSubject>>();
 builder.Services.AddScoped<IApprovalEngineResolver, ApprovalEngineResolver>();
 builder.Services.AddScoped<IApprovalGroupingPolicy, ApprovalGroupingPolicy>();
 builder.Services.AddScoped<IApprovalInboxService, ApprovalInboxService>();
@@ -258,59 +260,3 @@ builder.Services.AddScoped<IHrmSyncReviewQueryService, HrmSyncReviewQueryService
 builder.Services.AddScoped<IHrmSyncService, HrmSyncService>();
 builder.Services.AddScoped<IHrmAttendanceCalculationService, HrmAttendanceCalculationService>();
 builder.Services.AddScoped<IHrmAttendanceExcelExportService, HrmAttendanceExcelExportService>();
-builder.Services.AddScoped<IHrmUserRoleRuleService, HrmUserRoleRuleService>();
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.MapInboundClaims = false;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true, ValidIssuer = jwtOptions.Issuer,
-        ValidateAudience = true, ValidAudience = jwtOptions.Audience,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
-        ValidateLifetime = true, ClockSkew = TimeSpan.FromMinutes(5),
-        NameClaimType = "name", RoleClaimType = "role"
-    };
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            if (!context.HttpContext.Request.Path.StartsWithSegments("/hubs")) return Task.CompletedTask;
-            var qs = context.Request.Query["access_token"].ToString();
-            if (!string.IsNullOrEmpty(qs)) { context.Token = qs; return Task.CompletedTask; }
-            var header = context.Request.Headers["Authorization"].ToString();
-            if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) context.Token = header["Bearer ".Length..];
-            return Task.CompletedTask;
-        }
-    };
-});
-
-builder.Services.AddAuthorization();
-builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
-{
-    var feature = context.Features.Get<IExceptionHandlerFeature>();
-    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-    context.Response.ContentType = "application/json";
-    await context.Response.WriteAsJsonAsync(new { message = feature?.Error.Message ?? "Unexpected error." });
-}));
-app.UseHttpsRedirection();
-app.UseCors("FccCorsPolicy");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.MapHealthChecks("/health");
-app.MapHub<NotificationHub>("/hubs/notifications");
-
-app.Run();
