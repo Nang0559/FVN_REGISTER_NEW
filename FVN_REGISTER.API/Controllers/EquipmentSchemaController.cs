@@ -148,7 +148,14 @@ public sealed class EquipmentSchemaController : ControllerBase
         if (!await _authorization.HasAsync(user, SecurityFunctionCodes.EquipmentImport, ct)) throw new UnauthorizedAccessException("Bạn chưa có quyền quản lý Equipment Schema.");
         return user;
     }
-    private async Task<bool> CanDeptAsync(FVN_REGISTER.Contract.Dtos.Authentication.UserIdentityDto user, string deptCode, CancellationToken ct) => user.IsAdmin || string.Equals(user.DeptCode, deptCode, StringComparison.OrdinalIgnoreCase) || await _authorization.CanAccessAsync(user, SecurityFunctionCodes.EquipmentImport, null, deptCode, ct);
+    private async Task<bool> CanDeptAsync(FVN_REGISTER.Contract.Dtos.Authentication.UserIdentityDto user, string deptCode, CancellationToken ct)
+    {
+        var normalizedDept = NormalizeDept(deptCode);
+        var userDept = NormalizeDept(user.DeptCode);
+        if (user.IsAdmin || string.Equals(userDept, normalizedDept, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return await _authorization.CanAccessAsync(user, SecurityFunctionCodes.EquipmentImport, null, normalizedDept, ct);
+    }
     private static EquipmentSchemaDto Map(F03EquipmentSchema x) => new() { Id = x.Id, DeptCode = x.DeptCode, SchemaName = x.SchemaName, Version = x.Version, Status = x.Status, IsActive = x.IsActive == true, Fields = x.Fields.Where(f => f.IsActive == true).OrderBy(f => f.DisplayOrder).ThenBy(f => f.FieldLabel).Select(MapField).ToList() };
     private static EquipmentFieldDefinitionDto MapField(F03EquipmentFieldDefinition x) => new() { Id = x.Id, SchemaId = x.SchemaId, DeptCode = x.DeptCode, FieldKey = x.FieldKey, FieldLabel = x.FieldLabel, DataType = x.DataType, IsRequired = x.IsRequired, IsImportable = x.IsImportable, IsSearchable = x.IsSearchable, IsActiveField = x.IsActiveField, DisplayOrder = x.DisplayOrder, MaxLength = x.MaxLength, DefaultValue = x.DefaultValue, OptionsJson = x.OptionsJson };
     private static string NormalizeDept(string value) => value.Trim().ToUpperInvariant();
