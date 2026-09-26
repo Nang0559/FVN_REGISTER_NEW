@@ -65,14 +65,12 @@ using FVN_REGISTER.Infrastructure.Services.Reports;
 using FVN_REGISTER.Infrastructure.Services.Statics;
 using FVN_REGISTER.Infrastructure.Services.Dashboards;
 using FVN_REGISTER.Infrastructure.Services.Users;
-using FVN_REGISTER.Infrastructure.Services.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+
 using System.Text;
 using FVN_REGISTER.Application.Configuration;
 using FVN_REGISTER.Infrastructure;
