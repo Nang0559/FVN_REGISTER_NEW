@@ -133,7 +133,7 @@ public sealed class SecurityFunctionRegistryService
         if (string.Equals(functionKey, request.ReplacementFunctionKey, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Không thể thay thế chức năng bằng chính nó.");
         var old = await _db.Functions.SingleOrDefaultAsync(x => x.FunctionKey == functionKey, ct) ?? throw new InvalidOperationException($"Không tìm thấy chức năng '{functionKey}'.");
         var replacement = await _db.Functions.SingleOrDefaultAsync(x => x.FunctionKey == request.ReplacementFunctionKey, ct) ?? throw new InvalidOperationException($"Không tìm thấy chức năng thay thế '{request.ReplacementFunctionKey}'.");
-        if (!replacement.IsActive || replacement.LifecycleStatus != "Active") throw new InvalidOperationException("Chức năng thay thế phải đang hoạt động.");
+        if (replacement.IsActive != true || replacement.LifecycleStatus != "Active") throw new InvalidOperationException("Chức năng thay thế phải đang hoạt động.");
         old.LifecycleStatus = "Replaced"; old.ReplacementFunctionKey = replacement.FunctionKey; old.IsActive = false; old.ModifiedBy = actorUserId; old.ModifiedAt = DateTime.Now;
         var item = await _db.SecurityFunctionRegistry.SingleOrDefaultAsync(x => x.FunctionKey == functionKey, ct); if (item != null) { item.LifecycleStatus = "Replaced"; item.ReplacementFunctionKey = replacement.FunctionKey; item.ResolvedAt = DateTime.Now; }
         await _db.SaveChangesAsync(ct);
