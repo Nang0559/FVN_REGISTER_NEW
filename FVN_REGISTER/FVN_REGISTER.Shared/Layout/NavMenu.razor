@@ -125,7 +125,7 @@
         </MudNavGroup>
     }
 
-    @if (Can(SecurityFunctionCodes.UserManagementView))
+    @if (Can(SecurityFunctionCodes.UserManagementView) || _permissions?.RoleCodes.Contains(1) == true)
     {
         <MudNavGroup Title="Hệ thống" Icon="@Icons.Material.Filled.Settings" Expanded="false">
             @if (Can(SecurityFunctionCodes.UserManagementView)) { <MudNavLink href="/admin/managers" Icon="@Icons.Material.Filled.AdminPanelSettings">Quản trị viên</MudNavLink> }
