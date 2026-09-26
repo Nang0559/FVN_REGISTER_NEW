@@ -32,13 +32,18 @@
 
     <MudTabs Rounded="true" Elevation="0">
         <MudTabPanel Text="Chờ đăng ký" Icon="@Icons.Material.Filled.NewReleases">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                Function đã có mã sẽ đăng ký trực tiếp. Candidate API/UI chưa có mã sẽ mở form để quản trị viên gán FunctionCode trước; không được tự cấp quyền.
+            </MudText>
             <MudTable T="SecurityFunctionRegistryItemDto" Items="PendingRegistration" Dense="true" Hover="true" Bordered="true" Loading="_busy">
                 <HeaderContent><MudTh>FunctionKey</MudTh><MudTh>Code</MudTh><MudTh>Module</MudTh><MudTh>Action</MudTh><MudTh>Source</MudTh><MudTh>Thao tác</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd><b>@context.FunctionKey</b><br /><MudText Typo="Typo.caption">@context.DefinitionName</MudText></MudTd>
-                    <MudTd>@context.FunctionCode</MudTd><MudTd>@context.ModuleCode</MudTd><MudTd>@context.ActionCode</MudTd><MudTd>@context.SourceType</MudTd>
+                    <MudTd>@(context.FunctionCode > 0 ? context.FunctionCode.ToString() : "Chưa gán")</MudTd><MudTd>@context.ModuleCode</MudTd><MudTd>@context.ActionCode</MudTd><MudTd>@context.SourceType</MudTd>
                     <MudTd>
-                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SelectForRegistration(context))">Đăng ký</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => RegisterOrPrepareAsync(context))">
+                            @(context.FunctionCode > 0 ? "Đăng ký" : "Gán mã")
+                        </MudButton>
                         <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => IgnoreAsync(context))">Bỏ qua</MudButton>
                     </MudTd>
                 </RowTemplate>
@@ -94,7 +99,7 @@
                     <HeaderContent><MudTh>Code</MudTh><MudTh>Module</MudTh><MudTh>Action</MudTh><MudTh>Detail</MudTh><MudTh /></HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.FunctionCode</MudTd><MudTd>@context.ModuleCode</MudTd><MudTd>@context.ActionCode</MudTd><MudTd>@context.Detail</MudTd>
-                        <MudTd><MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text" OnClick="@(() => DeleteFunctionAsync(context.FunctionCode))">Xóa/Ngừng</MudButton></MudTd>
+                        <MudTd><MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text" OnClick="@(() => DeleteFunctionAsync(context.IdFunction))">Xóa/Ngừng</MudButton></MudTd>
                     </RowTemplate>
                 </MudTable>
             </MudPaper>
@@ -173,6 +178,41 @@
         if (roles.IsSuccess) _roles = roles.Data ?? new();
     }
 
+    private async Task RegisterOrPrepareAsync(SecurityFunctionRegistryItemDto item)
+    {
+        if (item.FunctionCode <= 0)
+        {
+            SelectForRegistration(item);
+            Snackbar.Add($"{item.FunctionKey} là Candidate chưa có FunctionCode. Hãy gán mã trong form rồi bấm Lưu Function.", Severity.Info);
+            return;
+        }
+
+        var request = new RegisterDiscoveredFunctionRequest(
+            item.DefinitionName,
+            $"Security capability {item.FunctionKey}",
+            item.ModuleCode,
+            item.ActionCode,
+            item.ScopeCode);
+
+        _busy = true;
+        try
+        {
+            var result = await SecurityService.RegisterSecurityFunctionAsync(item.FunctionKey, request);
+            if (!result.IsSuccess)
+            {
+                Snackbar.Add(result.Message ?? $"Không thể đăng ký {item.FunctionKey}.", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"Đã đăng ký Function {item.FunctionKey}.", Severity.Success);
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     private void SelectForRegistration(SecurityFunctionRegistryItemDto item)
     {
         _selectedKey = item.FunctionKey;
@@ -193,11 +233,10 @@
         Snackbar.Add("Đã lưu Function.", Severity.Success); await ReloadAsync();
     }
 
-    private async Task DeleteFunctionAsync(int code)
+    private async Task DeleteFunctionAsync(int idFunction)
     {
-        var item = _items.FirstOrDefault(x => x.FunctionCode == code);
-        if (item == null) return;
-        var result = await SecurityService.DeleteSecurityFunctionAsync(item.Id);
+        if (idFunction <= 0) return;
+        var result = await SecurityService.DeleteSecurityFunctionAsync(idFunction);
         if (!result.IsSuccess) { Snackbar.Add(result.Message ?? "Không thể xóa/ngừng Function.", Severity.Error); return; }
         Snackbar.Add("Function đã được xóa hoặc chuyển sang Retired theo trạng thái sử dụng.", Severity.Success); await ReloadAsync();
     }
