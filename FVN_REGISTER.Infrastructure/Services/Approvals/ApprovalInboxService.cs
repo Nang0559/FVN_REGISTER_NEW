@@ -1,15 +1,13 @@
-
 using FVN_REGISTER.Application.Interfaces.Orchestrators;
 using FVN_REGISTER.Application.Interfaces.Auths;
-
 using FVN_REGISTER.Application.Policies;
 using FVN_REGISTER.Application.Services.Common;
 using FVN_REGISTER.Contract.Dtos.Approvals;
 using FVN_REGISTER.Contract.Dtos.Authentication;
 using FVN_REGISTER.Application.Interfaces.Security;
 using FVN_REGISTER.Core.Constants;
+using FVN_REGISTER.Core.Enums;
 using FVN_REGISTER.Application.Models.Subjects;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -21,6 +19,7 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
         private readonly IApprovalWorkflowOrchestrator<OTRequestSubject> _otWorkflow;
         private readonly IApprovalWorkflowOrchestrator<TripRequestSubject> _tripWorkflow;
         private readonly IApprovalWorkflowOrchestrator<EquipmentRequestSubject> _equipmentWorkflow;
+        private readonly IApprovalWorkflowOrchestrator<PayrollPeriodSubject> _payrollWorkflow;
         private readonly IApprovalGroupingPolicy _groupingPolicy;
         private readonly IAuthorizationService _authorization;
         private readonly IApprovalPolicyService _approvalPolicies;
@@ -31,6 +30,7 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             IApprovalWorkflowOrchestrator<OTRequestSubject> otWorkflow,
             IApprovalWorkflowOrchestrator<TripRequestSubject> tripWorkflow,
             IApprovalWorkflowOrchestrator<EquipmentRequestSubject> equipmentWorkflow,
+            IApprovalWorkflowOrchestrator<PayrollPeriodSubject> payrollWorkflow,
             IApprovalGroupingPolicy groupingPolicy,
             IAuthorizationService authorization,
             IApprovalPolicyService approvalPolicies,
@@ -43,28 +43,25 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             _otWorkflow = otWorkflow;
             _tripWorkflow = tripWorkflow;
             _equipmentWorkflow = equipmentWorkflow;
+            _payrollWorkflow = payrollWorkflow;
             _groupingPolicy = groupingPolicy;
             _authorization = authorization;
             _approvalPolicies = approvalPolicies;
             _audit = audit;
         }
 
-        public async Task<ServiceResult<List<PendingApprovalGroupDto>>> GetPendingAsync(
-            UserIdentityDto user,
-            CancellationToken ct = default)
+        public async Task<ServiceResult<List<PendingApprovalGroupDto>>> GetPendingAsync(UserIdentityDto user, CancellationToken ct = default)
         {
             try
             {
-                // All approval workflows are scoped services and share the same UnitOfWork/DbContext.
-                // Do not execute EF queries concurrently on those workflows: DbContext is not thread-safe.
-                // Running these reads sequentially also keeps the current DI lifetime safe without
-                // requiring a separate DbContextFactory for every workflow.
+                // Scoped workflows share one DbContext; keep reads sequential.
                 var byModule = new Dictionary<RequestModule, List<PendingApprovalItemDto>>
                 {
                     [RequestModule.Leave] = await _leaveWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct),
                     [RequestModule.Overtime] = await _otWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct),
                     [RequestModule.Trip] = await _tripWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct),
-                    [RequestModule.Equipment] = await _equipmentWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct)
+                    [RequestModule.Equipment] = await _equipmentWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct),
+                    [RequestModule.Payroll] = await _payrollWorkflow.GetPendingForApproverAsync(user.Email ?? "", ct)
                 };
 
                 var scopedByModule = new Dictionary<RequestModule, List<PendingApprovalItemDto>>();
@@ -76,61 +73,41 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                         RequestModule.Overtime => SecurityFunctionCodes.OTApprove,
                         RequestModule.Trip => SecurityFunctionCodes.TripApprove,
                         RequestModule.Equipment => SecurityFunctionCodes.EquipmentApprove,
+                        RequestModule.Payroll => SecurityFunctionCodes.PayrollApprove,
                         _ => 0
                     };
-
-                    if (functionCode == 0)
-                        continue;
+                    if (functionCode == 0) continue;
 
                     var scopedItems = new List<PendingApprovalItemDto>();
                     foreach (var item in pair.Value)
                     {
                         var policyAllows = await _approvalPolicies.CanApproveAsync(
-                            pair.Key,
-                            item.EmployeeCode,
-                            user.EmployeeCode ?? string.Empty,
-                            GetCurrentLevel(item),
-                            ct);
+                            pair.Key, item.EmployeeCode, user.EmployeeCode ?? string.Empty,
+                            GetCurrentLevel(item), ct);
 
                         if (policyAllows && await _authorization.CanAccessAsync(
-                            user,
-                            functionCode,
-                            item.EmployeeCode,
-                            item.DeptCode,
-                            ct))
-                        {
+                            user, functionCode, item.EmployeeCode, item.DeptCode, ct))
                             scopedItems.Add(item);
-                        }
                     }
                     scopedByModule[pair.Key] = scopedItems;
                 }
 
-                var grouped = _groupingPolicy.BuildGroups(scopedByModule);
-                return ServiceResult<List<PendingApprovalGroupDto>>.Ok(grouped);
+                return ServiceResult<List<PendingApprovalGroupDto>>.Ok(
+                    _groupingPolicy.BuildGroups(scopedByModule));
             }
             catch (Exception ex)
             {
-                return InternalError<List<PendingApprovalGroupDto>>(
-                    ex, "Lỗi hệ thống khi tải danh sách chờ duyệt.");
+                return InternalError<List<PendingApprovalGroupDto>>(ex, "Lỗi hệ thống khi tải danh sách chờ duyệt.");
             }
         }
 
-        public async Task<ServiceResult> ApproveItemsAsync(
-            List<int> ids,
-            RequestModule kind,
-            int level,
-            string? comment,
-            UserIdentityDto user,
-            CancellationToken ct = default)
+        public async Task<ServiceResult> ApproveItemsAsync(List<int> ids, RequestModule kind, int level, string? comment, UserIdentityDto user, CancellationToken ct = default)
         {
-            if (ids == null || ids.Count == 0)
-                return ServiceResult.Fail("Không có đơn nào được chọn.");
-
+            if (ids == null || ids.Count == 0) return ServiceResult.Fail("Không có đơn nào được chọn.");
             try
             {
                 var validation = await ValidateRequestedItemsAsync(ids, kind, level, user, ct);
-                if (!validation.Success)
-                    return validation;
+                if (!validation.Success) return validation;
 
                 var action = BuildActionDto(ids.Distinct().ToList(), kind, level, comment, false, user);
                 var result = kind switch
@@ -139,20 +116,19 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                     RequestModule.Overtime => await _otWorkflow.ApproveAsync(action, ct),
                     RequestModule.Trip => await _tripWorkflow.ApproveAsync(action, ct),
                     RequestModule.Equipment => await _equipmentWorkflow.ApproveAsync(action, ct),
+                    RequestModule.Payroll => await _payrollWorkflow.ApproveAsync(action, ct),
                     _ => throw new NotSupportedException($"Module {kind} chưa được hỗ trợ ở Inbox.")
                 };
 
                 if (result.Success)
                 {
-                    await _audit.LogAction("APPROVAL_APPROVED", user.UserId, $"Kind={kind}; Level={level}; RequestIds={string.Join(',', ids.Distinct())}", ct: ct);
+                    await _audit.LogAction("APPROVAL_APPROVED", user.UserId,
+                        $"Kind={kind}; Level={level}; RequestIds={string.Join(',', ids.Distinct())}", ct: ct);
                     return ServiceResult.Ok(result.Message);
                 }
                 return ServiceResult.Fail(result.Message ?? "Duyệt thất bại.");
             }
-            catch (NotSupportedException ex)
-            {
-                return ServiceResult.Fail(ex.Message);
-            }
+            catch (NotSupportedException ex) { return ServiceResult.Fail(ex.Message); }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[INBOX] ApproveItems ERROR Kind={Kind}", kind);
@@ -160,24 +136,14 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             }
         }
 
-        public async Task<ServiceResult> RejectItemsAsync(
-            List<int> ids,
-            RequestModule kind,
-            int level,
-            string comment,
-            UserIdentityDto user,
-            CancellationToken ct = default)
+        public async Task<ServiceResult> RejectItemsAsync(List<int> ids, RequestModule kind, int level, string comment, UserIdentityDto user, CancellationToken ct = default)
         {
-            if (ids == null || ids.Count == 0)
-                return ServiceResult.Fail("Không có đơn nào được chọn.");
-            if (string.IsNullOrWhiteSpace(comment))
-                return ServiceResult.Fail("Lý do từ chối không được để trống.");
-
+            if (ids == null || ids.Count == 0) return ServiceResult.Fail("Không có đơn nào được chọn.");
+            if (string.IsNullOrWhiteSpace(comment)) return ServiceResult.Fail("Lý do từ chối không được để trống.");
             try
             {
                 var validation = await ValidateRequestedItemsAsync(ids, kind, level, user, ct);
-                if (!validation.Success)
-                    return validation;
+                if (!validation.Success) return validation;
 
                 var action = BuildActionDto(ids.Distinct().ToList(), kind, level, comment, true, user);
                 var result = kind switch
@@ -186,20 +152,19 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
                     RequestModule.Overtime => await _otWorkflow.RejectAsync(action, ct),
                     RequestModule.Trip => await _tripWorkflow.RejectAsync(action, ct),
                     RequestModule.Equipment => await _equipmentWorkflow.RejectAsync(action, ct),
+                    RequestModule.Payroll => await _payrollWorkflow.RejectAsync(action, ct),
                     _ => throw new NotSupportedException($"Module {kind} chưa được hỗ trợ ở Inbox.")
                 };
 
                 if (result.Success)
                 {
-                    await _audit.LogAction("APPROVAL_REJECTED", user.UserId, $"Kind={kind}; Level={level}; RequestIds={string.Join(',', ids.Distinct())}", ct: ct);
+                    await _audit.LogAction("APPROVAL_REJECTED", user.UserId,
+                        $"Kind={kind}; Level={level}; RequestIds={string.Join(',', ids.Distinct())}", ct: ct);
                     return ServiceResult.Ok(result.Message);
                 }
                 return ServiceResult.Fail(result.Message ?? "Từ chối thất bại.");
             }
-            catch (NotSupportedException ex)
-            {
-                return ServiceResult.Fail(ex.Message);
-            }
+            catch (NotSupportedException ex) { return ServiceResult.Fail(ex.Message); }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[INBOX] RejectItems ERROR Kind={Kind}", kind);
@@ -207,27 +172,18 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
             }
         }
 
-
-        private async Task<ServiceResult> ValidateRequestedItemsAsync(
-            List<int> ids,
-            RequestModule kind,
-            int level,
-            UserIdentityDto user,
-            CancellationToken ct)
+        private async Task<ServiceResult> ValidateRequestedItemsAsync(List<int> ids, RequestModule kind, int level, UserIdentityDto user, CancellationToken ct)
         {
             var normalizedIds = ids.Distinct().Where(x => x > 0).ToList();
-            if (normalizedIds.Count == 0)
-                return ServiceResult.Fail("Không có đơn hợp lệ được chọn.");
+            if (normalizedIds.Count == 0) return ServiceResult.Fail("Không có đơn hợp lệ được chọn.");
 
             var pending = await GetPendingAsync(user, ct);
             if (!pending.Success || pending.Data == null)
                 return ServiceResult.Fail(pending.Message ?? "Không thể xác thực phạm vi phê duyệt.");
 
-            var allowed = pending.Data
-                .SelectMany(x => x.Requests)
+            var allowed = pending.Data.SelectMany(x => x.Requests)
                 .Where(x => x.Kind == kind && x.CanApprove && GetCurrentLevel(x) == level)
-                .Select(x => x.RequestId)
-                .ToHashSet();
+                .Select(x => x.RequestId).ToHashSet();
 
             if (normalizedIds.Any(id => !allowed.Contains(id)))
                 return ServiceResult.Fail("Một hoặc nhiều đơn không thuộc phạm vi phê duyệt của tài khoản hiện tại hoặc đã thay đổi trạng thái.");
@@ -236,28 +192,19 @@ namespace FVN_REGISTER.Infrastructure.Services.Approvals
         }
 
         private static int GetCurrentLevel(PendingApprovalItemDto item)
-            => item.ApprovalSteps
-                .Where(x => x.IsRequired && x.IsApproved == null)
-                .OrderBy(x => x.Level)
-                .Select(x => x.Level)
-                .FirstOrDefault();
+            => item.ApprovalSteps.Where(x => x.IsRequired && x.IsApproved == null)
+                .OrderBy(x => x.Level).Select(x => x.Level).FirstOrDefault();
 
-        private static ApprovalActionDto BuildActionDto(
-            List<int> ids,
-            RequestModule kind,
-            int level,
-            string? comment,
-            bool isReject,
-            UserIdentityDto user) => new()
-            {
-                RequestIds = ids,
-                Kind = kind,
-                Level = level,
-                IsReject = isReject,
-                Comment = comment,
-                ApproverCode = user.EmployeeCode ?? "",
-                ApproverPermission = user.Permission,
-                ApproverPositionCode = user.PositionCode
-            };
+        private static ApprovalActionDto BuildActionDto(List<int> ids, RequestModule kind, int level, string? comment, bool isReject, UserIdentityDto user) => new()
+        {
+            RequestIds = ids,
+            Kind = kind,
+            Level = level,
+            IsReject = isReject,
+            Comment = comment,
+            ApproverCode = user.EmployeeCode ?? "",
+            ApproverPermission = user.Permission,
+            ApproverPositionCode = user.PositionCode
+        };
     }
 }
