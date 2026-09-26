@@ -8,6 +8,7 @@ using FVN_REGISTER.Contract.Dtos.ApprovelSnapshotDto;
 using FVN_REGISTER.Core.Constants;
 using FVN_REGISTER.Core.Entities.Equipment;
 using FVN_REGISTER.Core.Entities.HR;
+using FVN_REGISTER.Core.Entities.PublicForms;
 using FVN_REGISTER.Core.Enums;
 using FVN_REGISTER.Core.Repositories;
 using FVN_REGISTER.Infrastructure.Services.Common;
@@ -113,6 +114,22 @@ public sealed class EquipmentApprovalProvider
                     ? ApprovalStatus.InProgress
                     : ApprovalStatus.Pending;
 
+        if (entity.RequestKind == EquipmentRequestKind.Form && entity.FormSubmissionId.HasValue)
+        {
+            var submission = await _uow.Repository<F03PublicFormSubmission>().Query()
+                .FirstOrDefaultAsync(x => x.Id == entity.FormSubmissionId.Value, ct);
+            if (submission != null)
+            {
+                submission.Status = entity.RequestStatus switch
+                {
+                    ApprovalStatus.Approved => "Approved",
+                    ApprovalStatus.Rejected => "Rejected",
+                    ApprovalStatus.InProgress => "InProgress",
+                    _ => "PendingApproval"
+                };
+            }
+        }
+
         if (entity.RequestStatus == ApprovalStatus.Approved)
         {
             if (entity.RequestKind == EquipmentRequestKind.Registration && entity.AssetId == null)
@@ -197,6 +214,7 @@ public sealed class EquipmentApprovalProvider
                 {
                     subject.RequestId,
                     subject.RequestKind,
+                    subject.FormCode,
                     subject.EquipmentName,
                     subject.AssetCode,
                     subject.RepairDate,
