@@ -44,11 +44,8 @@ public sealed class WorkCalendarController : BaseApiController
         if (UserInfo?.UserId is not int userId || string.IsNullOrWhiteSpace(UserInfo.EmployeeCode))
             return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không có định danh nhân viên hợp lệ."));
 
-        if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
-            return Forbid();
-
         var modules = await GetAuthorizedModulesAsync(UserInfo, ct);
-        if (modules.Count == 0)
+        if (!await CanViewOwnCalendarAsync(UserInfo, modules, ct))
             return Forbid();
 
         var today = DateOnly.FromDateTime(DateTime.Today);
@@ -75,12 +72,25 @@ public sealed class WorkCalendarController : BaseApiController
         if (UserInfo?.UserId is not int userId || string.IsNullOrWhiteSpace(UserInfo.EmployeeCode))
             return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không có định danh nhân viên hợp lệ."));
 
-        if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
-            return Forbid();
-
         var modules = await GetAuthorizedModulesAsync(UserInfo, ct);
-        if (modules.Count == 0)
-            return Forbid();
+        var isOwnEmployee = string.Equals(
+            UserInfo.EmployeeCode?.Trim(),
+            employeeCode?.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+
+        if (isOwnEmployee)
+        {
+            if (!await CanViewOwnCalendarAsync(UserInfo, modules, ct))
+                return Forbid();
+        }
+        else
+        {
+            if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
+                return Forbid();
+
+            if (modules.Count == 0)
+                return Forbid();
+        }
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         var first = from ?? new DateOnly(today.Year, today.Month, 1);
@@ -101,11 +111,8 @@ public sealed class WorkCalendarController : BaseApiController
         if (UserInfo?.UserId is not int userId || string.IsNullOrWhiteSpace(UserInfo.EmployeeCode))
             return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không có định danh nhân viên hợp lệ."));
 
-        if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
-            return Forbid();
-
         var modules = await GetAuthorizedModulesAsync(UserInfo, ct);
-        if (modules.Count == 0)
+        if (!await CanViewOwnCalendarAsync(UserInfo, modules, ct))
             return Forbid();
 
         var today = DateOnly.FromDateTime(DateTime.Today);
@@ -129,12 +136,25 @@ public sealed class WorkCalendarController : BaseApiController
         if (UserInfo?.UserId is not int userId || string.IsNullOrWhiteSpace(UserInfo.EmployeeCode))
             return Unauthorized(ApiResponse<object>.Fail("Phiên đăng nhập không có định danh nhân viên hợp lệ."));
 
-        if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
-            return Forbid();
-
         var modules = await GetAuthorizedModulesAsync(UserInfo, ct);
-        if (modules.Count == 0)
-            return Forbid();
+        var isOwnEmployee = string.Equals(
+            UserInfo.EmployeeCode?.Trim(),
+            employeeCode?.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+
+        if (isOwnEmployee)
+        {
+            if (!await CanViewOwnCalendarAsync(UserInfo, modules, ct))
+                return Forbid();
+        }
+        else
+        {
+            if (!await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.CalendarView, ct))
+                return Forbid();
+
+            if (modules.Count == 0)
+                return Forbid();
+        }
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         var first = from ?? today.AddDays(-30);
@@ -188,6 +208,20 @@ public sealed class WorkCalendarController : BaseApiController
             ct);
 
         return Ok(ApiResponse<object>.Ok(result));
+    }
+
+    private async Task<bool> CanViewOwnCalendarAsync(
+        FVN_REGISTER.Contract.Dtos.Authentication.UserIdentityDto user,
+        IReadOnlySet<string> modules,
+        CancellationToken ct)
+    {
+        if (await _authorization.HasAsync(user, SecurityFunctionCodes.CalendarView, ct))
+            return true;
+
+        // Self-service calendar access can come from any module view
+        // capability. This never expands the caller's data scope to another
+        // employee; cross-employee access remains Calendar.View + ManagedScope.
+        return modules.Count > 0;
     }
 
     private async Task<HashSet<string>> GetAuthorizedModulesAsync(
