@@ -1,0 +1,139 @@
+@page "/equipment/workspace"
+@attribute [Authorize]
+@using FVN_REGISTER.Contract.Dtos.Depts
+@using FVN_REGISTER.Contract.Dtos.EquipmentImport
+@using FVN_REGISTER.Shared.Services.Equipment
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inherits AppComponentBase
+@inject IEquipmentClientService EquipmentClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Equipment Import</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
+        <div><MudText Typo="Typo.h4" Style="font-weight:800">Equipment Import</MudText><MudText Typo="Typo.body2" Class="mud-text-secondary">DepartmentCode → Active Schema → Validate Excel → Stage → Commit</MudText></div>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Schema" OnClick="@(() => Navigation.NavigateTo("/equipment/schema-management"))">Department Schema</MudButton>
+    </MudStack>
+
+    @if (!_ready)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (!_access)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">Tài khoản chưa được cấp quyền Import Excel thiết bị.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Outlined="true" Class="pa-5 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">1. Department</MudText>
+            <MudSelect T="string" Label="Department" @bind-Value="_deptCode" Variant="Variant.Outlined" Dense="true">
+                @foreach (var dept in _departments)
+                {
+                    <MudSelectItem Value="@dept.DeptCode">@dept.DeptCode – @dept.DeptName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Class="mt-2">Giá trị gửi API/database: <b>@_deptCode</b></MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="LoadSchema" Disabled="@string.IsNullOrWhiteSpace(_deptCode)">Tải Active Schema</MudButton>
+        </MudPaper>
+
+        @if (_schema != null)
+        {
+            <MudPaper Outlined="true" Class="pa-5 mb-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <div><MudText Typo="Typo.h6">2. @_schema.SchemaName v@_schema.Version</MudText><MudText Typo="Typo.body2">DepartmentCode: <b>@_schema.DeptCode</b> • Status: <b>@_schema.Status</b></MudText></div>
+                    <MudChip T="string" Color="@(_schema.Status == "Active" ? Color.Success : Color.Warning)">@_schema.Status</MudChip>
+                </MudStack>
+                <MudTable Items="_schema.Fields.Where(x => x.IsActiveField).OrderBy(x => x.DisplayOrder)" Dense="true" Class="mt-3">
+                    <HeaderContent><MudTh>Field</MudTh><MudTh>Type</MudTh><MudTh>Required</MudTh><MudTh>Import</MudTh><MudTh>Max</MudTh><MudTh>Default</MudTh></HeaderContent>
+                    <RowTemplate><MudTd>@context.FieldLabel (@context.FieldKey)</MudTd><MudTd>@context.DataType</MudTd><MudTd>@(context.IsRequired ? "Yes" : "No")</MudTd><MudTd>@(context.IsImportable ? "Yes" : "No")</MudTd><MudTd>@context.MaxLength</MudTd><MudTd>@context.DefaultValue</MudTd></RowTemplate>
+                </MudTable>
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-5">
+                <MudText Typo="Typo.h6">3. Import Excel</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">Header được kiểm tra theo schema Active của @(_schema.DeptCode). Không cho phép tự nhập DepartmentCode.</MudText>
+                <MudCheckBox T="bool" @bind-Value="_assignToEmployee" Label="Giao thiết bị cho nhân viên" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.caption" Class="d-block mb-2">Khi bật, Excel bắt buộc có cột <b>Mã nhân viên / EmployeeCode</b>. Hệ thống sẽ đối chiếu từng dòng với HR Master trước khi cho phép commit.</MudText>
+                <InputFile OnChange="OnFileSelected" accept=".xls,.xlsx,.xlsm,.xlsb" />
+                @if (_file != null)
+                {
+                    <MudAlert Severity="Severity.Info" Class="my-3">@_file.Name (@_file.Size bytes)</MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StageAsync" Disabled="_uploading">@(_uploading ? "Đang validate..." : "Upload & Preview")</MudButton>
+                }
+                @if (_batch != null)
+                {
+                    <MudDivider Class="my-4" /><MudText Typo="Typo.subtitle1">Batch #@_batch.Id</MudText><MudText>Trạng thái: @_batch.Status</MudText><MudText>Tổng: @_batch.TotalRows • Hợp lệ: @_batch.ValidRows • Lỗi: @_batch.InvalidRows</MudText>
+                    @if (_batch.Rows.Any(x => !string.IsNullOrWhiteSpace(x.ErrorMessage)))
+                    {
+                        <MudAlert Severity="Severity.Error" Class="my-3">@foreach (var row in _batch.Rows.Where(x => !string.IsNullOrWhiteSpace(x.ErrorMessage)).Take(10)) { <div>Dòng @row.RowNumber: @row.ErrorMessage</div> }</MudAlert>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Class="mt-3" Disabled="@(_batch.InvalidRows > 0)" OnClick="CommitAsync">Commit vào hệ thống</MudButton>
+                }
+            </MudPaper>
+        }
+        else if (!string.IsNullOrWhiteSpace(_deptCode))
+        {
+            <MudAlert Severity="Severity.Warning">Department <b>@_deptCode</b> chưa có Active Schema. Admin cần tạo/kích hoạt schema trước khi import.</MudAlert>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _ready;
+    private bool _access;
+    private bool _uploading;
+    private bool _assignToEmployee;
+    private string _deptCode = string.Empty;
+    private List<DepartmentDto> _departments = new();
+    private EquipmentSchemaDto? _schema;
+    private EquipmentImportBatchDto? _batch;
+    private IBrowserFile? _file;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var access = await EquipmentClient.HasImportAccessAsync();
+        _access = access.IsSuccess && access.Data;
+        if (_access)
+        {
+            var departments = await EquipmentClient.GetEquipmentDepartmentsAsync();
+            if (departments.IsSuccess) _departments = departments.Data ?? new();
+            if (_departments.Count > 0) _deptCode = _departments[0].DeptCode;
+        }
+        _ready = true;
+    }
+
+    private async Task LoadSchema()
+    {
+        var list = await EquipmentClient.GetSchemasAsync(_deptCode);
+        if (!list.IsSuccess) { Snackbar.Add(list.Message ?? "Không tải được schema.", Severity.Error); return; }
+        var active = list.Data?.FirstOrDefault(x => string.Equals(x.Status, "Active", StringComparison.OrdinalIgnoreCase));
+        if (active == null) { _schema = null; return; }
+        var result = await EquipmentClient.GetSchemaAsync(active.Id);
+        if (result.IsSuccess) _schema = result.Data; else Snackbar.Add(result.Message ?? "Không tải được schema chi tiết.", Severity.Error);
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _file = e.File;
+    private async Task StageAsync()
+    {
+        if (_file == null || string.IsNullOrWhiteSpace(_deptCode)) return;
+        _uploading = true;
+        try
+        {
+            var result = await EquipmentClient.StageImportAsync(_deptCode, _file, _assignToEmployee);
+            if (result.IsSuccess) { _batch = result.Data; Snackbar.Add("Excel đã staging theo Active Schema.", Severity.Success); }
+            else Snackbar.Add(result.Message ?? "Import thất bại.", Severity.Error);
+        }
+        finally { _uploading = false; }
+    }
+    private async Task CommitAsync()
+    {
+        if (_batch == null) return;
+        var result = await EquipmentClient.CommitImportAsync(_batch.Id);
+        Snackbar.Add(result.IsSuccess ? "Đã commit batch." : (result.Message ?? "Không thể commit."), result.IsSuccess ? Severity.Success : Severity.Error);
+        if (result.IsSuccess) await LoadSchema();
+    }
+}
