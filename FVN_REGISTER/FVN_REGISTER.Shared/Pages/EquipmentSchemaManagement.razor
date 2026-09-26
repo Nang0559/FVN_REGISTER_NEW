@@ -17,7 +17,7 @@
         <div>
             <MudText Typo="Typo.h5">Quản trị → Equipment → Mẫu dữ liệu</MudText>
             <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                Mẫu dữ liệu dùng chung cho nhập Excel. Người có quyền trong cùng phòng có thể xem, sử dụng và nhân bản; chỉ người tạo được sửa mẫu của mình.
+                Mẫu dữ liệu dùng chung cho nhập Excel. Người có quyền trong cùng phòng được xem, sử dụng và nhân bản; chỉ người tạo được sửa mẫu của mình.
             </MudText>
         </div>
         <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("/equipment"))">Quay lại Equipment</MudButton>
@@ -50,7 +50,9 @@
 
                 <MudPaper Outlined="true" Class="pa-4 mb-3">
                     <MudText Typo="Typo.h6">Tạo mẫu dữ liệu</MudText>
-                    <MudText Typo="body2" Class="mud-text-secondary mt-1">Có hai cách: lấy cấu trúc từ Excel hoặc tự định nghĩa từng trường.</MudText>
+                    <MudText Typo="body2" Class="mud-text-secondary mt-1">
+                        Có hai cách: tự định nghĩa từng trường hoặc đọc cấu trúc từ Excel rồi chỉnh sửa trước khi lưu.
+                    </MudText>
 
                     <MudTextField T="string" @bind-Value="_newSchemaName" Label="Tên mẫu dữ liệu" Variant="Variant.Outlined" Class="mt-3" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="CreateManualSchemaAsync">
@@ -59,7 +61,9 @@
 
                     <MudDivider Class="my-4" />
                     <MudText Typo="Typo.subtitle1">Tạo từ Excel</MudText>
-                    <MudText Typo="body2" Class="mud-text-secondary">Hệ thống đọc tiêu đề và dữ liệu mẫu để đề xuất kiểu dữ liệu, bắt buộc và độ dài.</MudText>
+                    <MudText Typo="body2" Class="mud-text-secondary">
+                        Hệ thống đọc tiêu đề và dữ liệu mẫu để đề xuất kiểu dữ liệu. Các đề xuất chỉ là bản nháp và có thể sửa trước khi tạo mẫu.
+                    </MudText>
 
                     <MudFileUpload T="IBrowserFile" FilesChanged="OnSchemaFileChanged" Accept=".xls,.xlsx,.xlsm" MaxFileSize="25000000" Class="mt-3">
                         <CustomContent Context="fileUpload">
@@ -78,21 +82,77 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Info" Class="mt-2" Disabled="@(_schemaFile == null || _readingExcel)" OnClick="PreviewExcelAsync">
                         @(_readingExcel ? "Đang đọc Excel..." : "Đọc cấu trúc Excel")
                     </MudButton>
-
-                    @if (_excelPreview != null)
-                    {
-                        <MudAlert Severity="Severity.Success" Class="mt-3">
-                            File <b>@_excelPreview.FileName</b>: @_excelPreview.ColumnCount cột, @_excelPreview.SampleRowCount dòng mẫu.
-                        </MudAlert>
-                        <MudTextField T="string" @bind-Value="_newSchemaName" Label="Tên mẫu dữ liệu đề xuất" Variant="Variant.Outlined" Class="mt-2" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" Class="mt-2" Disabled="@_creatingFromExcel" OnClick="CreateFromExcelAsync">
-                            @( _creatingFromExcel ? "Đang tạo..." : "Tạo mẫu từ Excel")
-                        </MudButton>
-                    }
                 </MudPaper>
             </MudItem>
 
             <MudItem xs="12" md="8">
+                @if (_excelPreview != null)
+                {
+                    <MudPaper Outlined="true" Class="pa-4 mb-3">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                            <div>
+                                <MudText Typo="Typo.h6">Xem trước cấu trúc từ Excel</MudText>
+                                <MudText Typo="body2">File: <b>@_excelPreview.FileName</b> · @_excelPreview.ColumnCount cột · @_excelPreview.SampleRowCount dòng mẫu</MudText>
+                            </div>
+                            <MudChip T="string" Size="Size.Small">Bản nháp</MudChip>
+                        </MudStack>
+
+                        <MudAlert Severity="Severity.Info" Class="mt-3">
+                            Kiểu dữ liệu bên dưới là đề xuất. Hãy kiểm tra và chỉnh sửa trước khi tạo mẫu chính thức.
+                            Đặc biệt không để mã, số điện thoại hoặc mã nhân viên bị nhận thành số nếu cần giữ số 0 ở đầu.
+                        </MudAlert>
+
+                        <MudGrid Class="mt-2" Spacing="2">
+                            <MudItem xs="12" md="8">
+                                <MudTextField T="string" @bind-Value="_newSchemaName" Label="Tên mẫu dữ liệu" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" Class="mt-2" Disabled="@_creatingFromExcel" OnClick="CreateFromExcelDefinitionAsync">
+                                    @(_creatingFromExcel ? "Đang tạo..." : "Tạo bản nháp từ cấu trúc này")
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_excelPreview.Fields.OrderBy(x => x.DisplayOrder)" Dense="true" Hover="true" Class="mt-4">
+                            <HeaderContent>
+                                <MudTh>Cột Excel</MudTh>
+                                <MudTh>Mã trường</MudTh>
+                                <MudTh>Kiểu dữ liệu</MudTh>
+                                <MudTh>Bắt buộc</MudTh>
+                                <MudTh>Độ dài</MudTh>
+                                <MudTh>Thứ tự</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <MudTextField T="string" @bind-Value="context.FieldLabel" Dense="true" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudTextField T="string" @bind-Value="context.FieldKey" Dense="true" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudSelect T="string" @bind-Value="context.DataType" Dense="true">
+                                        @foreach (var type in DataTypes)
+                                        {
+                                            <MudSelectItem Value="@type.Code">@type.Name</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudTd>
+                                <MudTd><MudCheckBox T="bool" @bind-Value="context.IsRequired" /></MudTd>
+                                <MudTd><MudNumericField T="int?" @bind-Value="context.MaxLength" Dense="true" /></MudTd>
+                                <MudTd><MudNumericField T="int" @bind-Value="context.DisplayOrder" Dense="true" /></MudTd>
+                                <MudTd>
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => RemovePreviewField(context))">Xóa</MudButton>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudButton Variant="Variant.Outlined" Class="mt-3" OnClick="AddPreviewField">
+                            + Thêm cột thủ công
+                        </MudButton>
+                    </MudPaper>
+                }
+
                 <MudPaper Outlined="true" Class="pa-4 mb-3">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                         <div>
@@ -130,7 +190,10 @@
                                         {
                                             <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SelectSchemaAsync(context.Id))">Sửa</MudButton>
                                         }
-                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => CloneSchemaAsync(context.Id))">Nhân bản</MudButton>
+                                        @if (context.CanClone)
+                                        {
+                                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => CloneSchemaAsync(context.Id))">Nhân bản</MudButton>
+                                        }
                                         @if (context.CanCreateVersion)
                                         {
                                             <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => CreateVersionAsync(context.Id))">Tạo phiên bản</MudButton>
@@ -154,7 +217,10 @@
                                 </MudText>
                             </div>
                             <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
-                                <MudButton Variant="Variant.Outlined" OnClick="@(() => CloneSchemaAsync(_schema.Id))">Nhân bản</MudButton>
+                                @if (_schema.CanClone)
+                                {
+                                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CloneSchemaAsync(_schema.Id))">Nhân bản</MudButton>
+                                }
                                 @if (_schema.IsOwner)
                                 {
                                     <MudButton Variant="Variant.Outlined" OnClick="@(() => CreateVersionAsync(_schema.Id))">Tạo phiên bản mới</MudButton>
@@ -191,12 +257,13 @@
 
                         <MudTable Items="_schema.Fields.OrderBy(x => x.DisplayOrder)" Dense="true" Hover="true">
                             <HeaderContent>
-                                <MudTh>Khóa</MudTh>
+                                <MudTh>Mã trường</MudTh>
                                 <MudTh>Tên hiển thị</MudTh>
                                 <MudTh>Kiểu dữ liệu</MudTh>
                                 <MudTh>Bắt buộc</MudTh>
                                 <MudTh>Độ dài</MudTh>
                                 <MudTh>Thứ tự</MudTh>
+                                <MudTh>Nhập Excel</MudTh>
                                 <MudTh></MudTh>
                             </HeaderContent>
                             <RowTemplate>
@@ -213,6 +280,7 @@
                                 <MudTd><MudCheckBox T="bool" @bind-Value="context.IsRequired" Disabled="@(!_schema.IsOwner || _schema.Status != "Draft")" /></MudTd>
                                 <MudTd><MudNumericField T="int?" @bind-Value="context.MaxLength" Disabled="@(!_schema.IsOwner || _schema.Status != "Draft")" Dense="true" /></MudTd>
                                 <MudTd><MudNumericField T="int" @bind-Value="context.DisplayOrder" Disabled="@(!_schema.IsOwner || _schema.Status != "Draft")" Dense="true" /></MudTd>
+                                <MudTd><MudCheckBox T="bool" @bind-Value="context.IsImportable" Disabled="@(!_schema.IsOwner || _schema.Status != "Draft")" /></MudTd>
                                 <MudTd>
                                     @if (_schema.IsOwner && _schema.Status == "Draft")
                                     {
@@ -276,7 +344,7 @@
     private EquipmentSchemaDto? _schema;
     private IBrowserFile? _schemaFile;
     private EquipmentSchemaFromExcelDto? _excelPreview;
-    private SaveEquipmentFieldDefinitionRequest _newField = new() { DataType = "Text", IsImportable = true, IsActiveField = true, DisplayOrder = 1 };
+    private SaveEquipmentFieldDefinitionRequest _newField = NewField(1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -286,8 +354,11 @@
         {
             var departments = await EquipmentClient.GetEquipmentDepartmentsAsync();
             if (departments.IsSuccess) _departments = departments.Data ?? new();
-            if (_departments.Count > 0) _deptCode = _departments[0].DeptCode;
-            await LoadSchemasAsync();
+            if (_departments.Count > 0)
+            {
+                _deptCode = _departments[0].DeptCode;
+                await LoadSchemasAsync();
+            }
         }
         _ready = true;
     }
@@ -324,39 +395,122 @@
             if (result.IsSuccess)
             {
                 _excelPreview = result.Data;
-                if (!string.IsNullOrWhiteSpace(_excelPreview?.SuggestedSchemaName)) _newSchemaName = _excelPreview.SuggestedSchemaName;
+                if (!string.IsNullOrWhiteSpace(_excelPreview?.SuggestedSchemaName))
+                    _newSchemaName = _excelPreview.SuggestedSchemaName;
             }
             else Snackbar.Add(result.Message ?? "Không đọc được cấu trúc Excel.", Severity.Error);
         }
         finally { _readingExcel = false; }
     }
 
-    private async Task CreateFromExcelAsync()
+    private async Task CreateFromExcelDefinitionAsync()
     {
-        if (_schemaFile == null || string.IsNullOrWhiteSpace(_deptCode)) return;
+        if (_excelPreview == null || string.IsNullOrWhiteSpace(_deptCode) || string.IsNullOrWhiteSpace(_newSchemaName)) return;
+        if (_excelPreview.Fields.Count == 0)
+        {
+            Snackbar.Add("Mẫu dữ liệu phải có ít nhất một trường.", Severity.Warning);
+            return;
+        }
+
         _creatingFromExcel = true;
         try
         {
-            var result = await EquipmentClient.CreateSchemaFromExcelAsync(_deptCode, _schemaFile, _newSchemaName);
-            if (result.IsSuccess)
+            var schemaResult = await EquipmentClient.SaveSchemaAsync(new EquipmentSchemaUpsertRequest
             {
-                _schema = result.Data;
-                await LoadSchemasWithoutClosingAsync();
-                Snackbar.Add("Đã tạo mẫu dữ liệu từ Excel ở trạng thái Bản nháp. Bạn có thể chỉnh sửa từng trường trước khi đưa vào sử dụng.", Severity.Success);
+                DeptCode = _deptCode,
+                SchemaName = _newSchemaName.Trim(),
+                SchemaKind = "Equipment",
+                Status = "Draft"
+            });
+
+            if (!schemaResult.IsSuccess || schemaResult.Data == null)
+            {
+                Snackbar.Add(schemaResult.Message ?? "Không tạo được mẫu dữ liệu.", Severity.Error);
+                return;
             }
-            else Snackbar.Add(result.Message ?? "Không tạo được mẫu dữ liệu từ Excel.", Severity.Error);
+
+            var schema = schemaResult.Data;
+            var ordered = _excelPreview.Fields.OrderBy(x => x.DisplayOrder).ToList();
+            var failed = 0;
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var field = ordered[i];
+                field.DisplayOrder = i + 1;
+                var fieldResult = await EquipmentClient.SaveSchemaFieldAsync(new SaveEquipmentFieldDefinitionRequest
+                {
+                    DeptCode = schema.DeptCode,
+                    SchemaId = schema.Id,
+                    FieldKey = field.FieldKey,
+                    FieldLabel = field.FieldLabel,
+                    DataType = field.DataType,
+                    IsRequired = field.IsRequired,
+                    IsImportable = field.IsImportable,
+                    IsSearchable = field.IsSearchable,
+                    IsActiveField = true,
+                    DisplayOrder = field.DisplayOrder,
+                    MaxLength = field.MaxLength,
+                    DefaultValue = field.DefaultValue,
+                    OptionsJson = field.OptionsJson
+                });
+                if (!fieldResult.IsSuccess) failed++;
+            }
+
+            if (failed > 0)
+            {
+                Snackbar.Add($"Đã tạo mẫu nháp nhưng còn {failed} trường chưa lưu. Hãy mở mẫu để hoàn tất.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Đã tạo mẫu dữ liệu từ Excel ở trạng thái Bản nháp. Bạn có thể tiếp tục chỉnh sửa rồi đưa vào sử dụng.", Severity.Success);
+            }
+
+            _excelPreview = null;
+            _schemaFile = null;
+            await LoadSchemasAsync();
+            await SelectSchemaAsync(schema.Id);
         }
         finally { _creatingFromExcel = false; }
+    }
+
+    private void AddPreviewField()
+    {
+        if (_excelPreview == null) return;
+        var next = _excelPreview.Fields.Count + 1;
+        _excelPreview.Fields.Add(new EquipmentFieldDefinitionDto
+        {
+            DeptCode = _deptCode,
+            FieldKey = $"cot{next}",
+            FieldLabel = $"Cột {next}",
+            DataType = "Text",
+            IsRequired = false,
+            IsImportable = true,
+            IsActiveField = true,
+            DisplayOrder = next
+        });
+    }
+
+    private void RemovePreviewField(EquipmentFieldDefinitionDto field)
+    {
+        if (_excelPreview == null) return;
+        _excelPreview.Fields.Remove(field);
+        var order = 1;
+        foreach (var item in _excelPreview.Fields.OrderBy(x => x.DisplayOrder)) item.DisplayOrder = order++;
     }
 
     private async Task CreateManualSchemaAsync()
     {
         if (string.IsNullOrWhiteSpace(_deptCode) || string.IsNullOrWhiteSpace(_newSchemaName)) return;
-        var result = await EquipmentClient.SaveSchemaAsync(new EquipmentSchemaUpsertRequest { DeptCode = _deptCode, SchemaName = _newSchemaName.Trim(), Status = "Draft" });
+        var result = await EquipmentClient.SaveSchemaAsync(new EquipmentSchemaUpsertRequest
+        {
+            DeptCode = _deptCode,
+            SchemaName = _newSchemaName.Trim(),
+            SchemaKind = "Equipment",
+            Status = "Draft"
+        });
         if (result.IsSuccess)
         {
-            _schema = result.Data;
-            await LoadSchemasWithoutClosingAsync();
+            await LoadSchemasAsync();
+            if (result.Data != null) await SelectSchemaAsync(result.Data.Id);
             Snackbar.Add("Đã tạo mẫu dữ liệu ở trạng thái Bản nháp.", Severity.Success);
         }
         else Snackbar.Add(result.Message ?? "Không tạo được mẫu dữ liệu.", Severity.Error);
@@ -367,8 +521,8 @@
         var result = await EquipmentClient.CloneSchemaAsync(schemaId, new EquipmentSchemaCloneRequest { Status = "Draft" });
         if (result.IsSuccess)
         {
-            _schema = result.Data;
-            await LoadSchemasWithoutClosingAsync();
+            await LoadSchemasAsync();
+            if (result.Data != null) await SelectSchemaAsync(result.Data.Id);
             Snackbar.Add("Đã nhân bản mẫu thành một mẫu mới thuộc quyền quản lý của bạn.", Severity.Success);
         }
         else Snackbar.Add(result.Message ?? "Không nhân bản được mẫu dữ liệu.", Severity.Error);
@@ -379,8 +533,8 @@
         var result = await EquipmentClient.CreateSchemaVersionAsync(schemaId);
         if (result.IsSuccess)
         {
-            _schema = result.Data;
-            await LoadSchemasWithoutClosingAsync();
+            await LoadSchemasAsync();
+            if (result.Data != null) await SelectSchemaAsync(result.Data.Id);
             Snackbar.Add($"Đã tạo phiên bản v{result.Data?.Version} ở trạng thái Bản nháp.", Severity.Success);
         }
         else Snackbar.Add(result.Message ?? "Không tạo được phiên bản mới.", Severity.Error);
@@ -399,8 +553,8 @@
         });
         if (result.IsSuccess)
         {
-            _schema = result.Data;
-            await LoadSchemasWithoutClosingAsync();
+            await LoadSchemasAsync();
+            if (result.Data != null) await SelectSchemaAsync(result.Data.Id);
             Snackbar.Add("Đã đưa mẫu dữ liệu vào sử dụng.", Severity.Success);
         }
         else Snackbar.Add(result.Message ?? "Không thể đưa mẫu dữ liệu vào sử dụng.", Severity.Error);
@@ -417,12 +571,7 @@
             SchemaKind = _schema.SchemaKind,
             Status = "Draft"
         });
-        if (result.IsSuccess)
-        {
-            _schema = result.Data;
-            await LoadSchemasWithoutClosingAsync();
-            Snackbar.Add("Đã lưu tên mẫu.", Severity.Success);
-        }
+        if (result.IsSuccess) Snackbar.Add("Đã lưu tên mẫu.", Severity.Success);
         else Snackbar.Add(result.Message ?? "Không lưu được tên mẫu.", Severity.Error);
     }
 
@@ -440,15 +589,7 @@
         if (result.IsSuccess)
         {
             _schema.Fields.Add(result.Data!);
-            _newField = new SaveEquipmentFieldDefinitionRequest
-            {
-                DeptCode = _schema.DeptCode,
-                SchemaId = _schema.Id,
-                DataType = "Text",
-                IsImportable = true,
-                IsActiveField = true,
-                DisplayOrder = _schema.Fields.Count + 1
-            };
+            _newField = NewField(_schema.Fields.Count + 1);
             Snackbar.Add("Đã thêm trường dữ liệu.", Severity.Success);
         }
         else Snackbar.Add(result.Message ?? "Không thêm được trường dữ liệu.", Severity.Error);
@@ -467,7 +608,7 @@
             IsRequired = field.IsRequired,
             IsImportable = field.IsImportable,
             IsSearchable = field.IsSearchable,
-            IsActiveField = true,
+            IsActiveField = field.IsActiveField,
             DisplayOrder = field.DisplayOrder,
             MaxLength = field.MaxLength,
             DefaultValue = field.DefaultValue,
@@ -482,11 +623,13 @@
         else Snackbar.Add(result.Message ?? "Không lưu được trường dữ liệu.", Severity.Error);
     }
 
-    private async Task LoadSchemasWithoutClosingAsync()
+    private static SaveEquipmentFieldDefinitionRequest NewField(int order) => new()
     {
-        var result = await EquipmentClient.GetSchemasAsync(_deptCode);
-        if (result.IsSuccess) _schemas = result.Data ?? new();
-    }
+        DataType = "Text",
+        IsImportable = true,
+        IsActiveField = true,
+        DisplayOrder = order
+    };
 
     private static string StatusText(string? status) => status?.ToLowerInvariant() switch
     {
