@@ -31,14 +31,51 @@ public class FVNWEBAPPContext : DbContext
     public DbSet<F03UserSession> UserSessions { get; set; }
     public DbSet<F03Role> Roles { get; set; }
     public DbSet<F03RoleFunction> RoleFunctions { get; set; }
-    public DbSet<F03UserRole> UserRoles { get; set; } public DbSet<F03AccessChangeRequest> AccessChangeRequests { get; set; }
-    public DbSet<F03Employee> Employees { get; set; } public DbSet<F03Department> Departments { get; set; } public DbSet<F03Position> Positions { get; set; } public DbSet<F03Gender> Genders { get; set; }
-    public DbSet<F03Approver> Approvers { get; set; } public DbSet<F03ApprovalReminderLog> ApprovalReminderLogs { get; set; } public DbSet<F03ApprovalPolicy> ApprovalPolicies { get; set; } public DbSet<F03ApprovalSelection> ApprovalSelections { get; set; } public DbSet<F03ApprovalSnapshot> ApprovalSnapshots { get; set; } public DbSet<F03ApprovalHistory> ApprovalHistories { get; set; }
-    public DbSet<F03LeaveBalance> LeaveBalances { get; set; } public DbSet<F03HrmAttendanceCalculated> HrmAttendanceCalculated { get; set; } public DbSet<F03LeaveType> LeaveTypes { get; set; } public DbSet<F03LeaveDay> LeaveDays { get; set; } public DbSet<F03LeaveDayDetail> LeaveDayDetails { get; set; } public DbSet<F03AttendanceStaging> AttendanceStagings { get; set; }
-    public DbSet<F03OTRequest> OvertimeRequests { get; set; } public DbSet<F03OTEmployee> OvertimeEmployees { get; set; } public DbSet<F03OTLimitRule> OvertimeLimitRules { get; set; } public DbSet<F03OTReasonCode> OvertimeReasonCodes { get; set; } public DbSet<F03OTType> OTTypes { get; set; }
-    public DbSet<F03TripRequest> TripRequests { get; set; } public DbSet<F03StagingTrip> StagingTrips { get; set; }
-    public DbSet<F03EquipmentAsset> EquipmentAssets { get; set; } public DbSet<F03EquipmentSchema> EquipmentSchemas { get; set; } public DbSet<F03EquipmentFieldDefinition> EquipmentFieldDefinitions { get; set; } public DbSet<F03EquipmentImportBatch> EquipmentImportBatches { get; set; } public DbSet<F03EquipmentImportRow> EquipmentImportRows { get; set; } public DbSet<F03EquipmentRequest> EquipmentRequests { get; set; } public DbSet<F03EquipmentRepairHistory> EquipmentRepairHistories { get; set; } public DbSet<F03EquipmentInspectionTemplate> EquipmentInspectionTemplates { get; set; } public DbSet<F03EquipmentInspectionItem> EquipmentInspectionItems { get; set; } public DbSet<F03EquipmentInspectionAssignment> EquipmentInspectionAssignments { get; set; } public DbSet<F03EquipmentInspectionTask> EquipmentInspectionTasks { get; set; } public DbSet<F03EquipmentInspectionItemResult> EquipmentInspectionItemResults { get; set; } public DbSet<F03EquipmentInspectionEvidence> EquipmentInspectionEvidence { get; set; }
-    public DbSet<F03StagingDepartment> StagingDepartments { get; set; } public DbSet<F03StagingEmployee> StagingEmployees { get; set; } public DbSet<F03StagingLeaveType> StagingLeaveTypes { get; set; } public DbSet<F03StagingOTType> StagingOTTypes { get; set; } public DbSet<F03StagingPosition> StagingPositions { get; set; } public DbSet<F03SyncReviewFlag> SyncReviewFlags { get; set; } public DbSet<HrmLeaveTypeChangeLog> HrmLeaveTypeChangeLogs { get; set; }
+    public DbSet<F03UserRole> UserRoles { get; set; }
+    public DbSet<F03AccessChangeRequest> AccessChangeRequests { get; set; }
+    public DbSet<F03Employee> Employees { get; set; }
+    public DbSet<F03Department> Departments { get; set; }
+    public DbSet<F03Position> Positions { get; set; }
+    public DbSet<F03Gender> Genders { get; set; }
+    public DbSet<F03Approver> Approvers { get; set; }
+    public DbSet<F03ApprovalReminderLog> ApprovalReminderLogs { get; set; }
+    public DbSet<F03ApprovalPolicy> ApprovalPolicies { get; set; }
+    public DbSet<F03ApprovalSelection> ApprovalSelections { get; set; }
+    public DbSet<F03ApprovalSnapshot> ApprovalSnapshots { get; set; }
+    public DbSet<F03ApprovalHistory> ApprovalHistories { get; set; }
+    public DbSet<F03LeaveBalance> LeaveBalances { get; set; }
+    public DbSet<F03HrmAttendanceCalculated> HrmAttendanceCalculated { get; set; }
+    public DbSet<F03LeaveType> LeaveTypes { get; set; }
+    public DbSet<F03LeaveDay> LeaveDays { get; set; }
+    public DbSet<F03LeaveDayDetail> LeaveDayDetails { get; set; }
+    public DbSet<F03AttendanceStaging> AttendanceStagings { get; set; }
+    public DbSet<F03OTRequest> OvertimeRequests { get; set; }
+    public DbSet<F03OTEmployee> OvertimeEmployees { get; set; }
+    public DbSet<F03OTLimitRule> OvertimeLimitRules { get; set; }
+    public DbSet<F03OTReasonCode> OvertimeReasonCodes { get; set; }
+    public DbSet<F03OTType> OTTypes { get; set; }
+    public DbSet<F03TripRequest> TripRequests { get; set; }
+    public DbSet<F03StagingTrip> StagingTrips { get; set; }
+    public DbSet<F03EquipmentAsset> EquipmentAssets { get; set; }
+    public DbSet<F03EquipmentSchema> EquipmentSchemas { get; set; }
+    public DbSet<F03EquipmentFieldDefinition> EquipmentFieldDefinitions { get; set; }
+    public DbSet<F03EquipmentImportBatch> EquipmentImportBatches { get; set; }
+    public DbSet<F03EquipmentImportRow> EquipmentImportRows { get; set; }
+    public DbSet<F03EquipmentRequest> EquipmentRequests { get; set; }
+    public DbSet<F03EquipmentRepairHistory> EquipmentRepairHistories { get; set; }
+    public DbSet<F03EquipmentInspectionTemplate> EquipmentInspectionTemplates { get; set; }
+    public DbSet<F03EquipmentInspectionItem> EquipmentInspectionItems { get; set; }
+    public DbSet<F03EquipmentInspectionAssignment> EquipmentInspectionAssignments { get; set; }
+    public DbSet<F03EquipmentInspectionTask> EquipmentInspectionTasks { get; set; }
+    public DbSet<F03EquipmentInspectionItemResult> EquipmentInspectionItemResults { get; set; }
+    public DbSet<F03EquipmentInspectionEvidence> EquipmentInspectionEvidence { get; set; }
+    public DbSet<F03StagingDepartment> StagingDepartments { get; set; }
+    public DbSet<F03StagingEmployee> StagingEmployees { get; set; }
+    public DbSet<F03StagingLeaveType> StagingLeaveTypes { get; set; }
+    public DbSet<F03StagingOTType> StagingOTTypes { get; set; }
+    public DbSet<F03StagingPosition> StagingPositions { get; set; }
+    public DbSet<F03SyncReviewFlag> SyncReviewFlags { get; set; }
+    public DbSet<HrmLeaveTypeChangeLog> HrmLeaveTypeChangeLogs { get; set; }
     public DbSet<F03AppNotification> AppNotifications { get; set; }
     public DbSet<F03CalendarModuleDefinition> CalendarModuleDefinitions { get; set; }
     public DbSet<F03CalendarModulePolicy> CalendarModulePolicies { get; set; }
@@ -53,21 +90,71 @@ public class FVNWEBAPPContext : DbContext
     public DbSet<F03ExecutionCorrection> ExecutionCorrections { get; set; }
     public DbSet<F03PayrollCalculationPeriod> PayrollCalculationPeriods { get; set; }
     public DbSet<F03PayrollInput> PayrollInputs { get; set; }
-    public DbSet<F03ActionPolicy> ActionPolicies { get; set; } public DbSet<F03AuditLog> AuditLogs { get; set; } public DbSet<F03Attachment> Attachments { get; set; } public DbSet<F03EmailQueue> EmailQueues { get; set; } public DbSet<F03EmailLog> EmailLogs { get; set; } public DbSet<F03EmailTemplate> EmailTemplates { get; set; } public DbSet<F03EmailProfile> EmailProfiles { get; set; } public DbSet<F03EmailDispatchPolicy> EmailDispatchPolicies { get; set; }
+    public DbSet<F03ActionPolicy> ActionPolicies { get; set; }
+    public DbSet<F03AuditLog> AuditLogs { get; set; }
+    public DbSet<F03Attachment> Attachments { get; set; }
+    public DbSet<F03EmailQueue> EmailQueues { get; set; }
+    public DbSet<F03EmailLog> EmailLogs { get; set; }
+    public DbSet<F03EmailTemplate> EmailTemplates { get; set; }
+    public DbSet<F03EmailProfile> EmailProfiles { get; set; }
+    public DbSet<F03EmailDispatchPolicy> EmailDispatchPolicies { get; set; }
     public DbSet<F03PublicInformation> PublicInformations { get; set; }
     public DbSet<F03PublicForm> PublicForms { get; set; }
     public DbSet<F03PublicFormQuestion> PublicFormQuestions { get; set; }
     public DbSet<F03PublicFormQuestionOption> PublicFormQuestionOptions { get; set; }
     public DbSet<F03PublicFormAudience> PublicFormAudiences { get; set; }
     public DbSet<F03PublicFormSubmission> PublicFormSubmissions { get; set; }
-    public DbSet<F03PublicFormAnswer> PublicFormAnswers { get; set; } public DbSet<F03HrmUserRoleRule> HrmUserRoleRules { get; set; } public DbSet<F03BusinessRule> BusinessRules { get; set; } public DbSet<F03CompanyHoliday> CompanyHolidays { get; set; } public DbSet<F03WorkYear> WorkYears { get; set; } public DbSet<F03EscalationLog> EscalationLogs { get; set; } public DbSet<F03EscalationRule> EscalationRules { get; set; } public DbSet<F03UserLog> UserLogs { get; set; }
-    public DbSet<VF03EmployeeApprover> VEmployeeApprovers { get; set; } public DbSet<VF03employee> VF03Employees { get; set; } public DbSet<vF03EmployeeAttendance> VF03EmployeeAttendances { get; set; } public DbSet<VF03LeaveRequest> VF03LeaveRequests { get; set; } public DbSet<VF03LeaveRequestDetail> VF03LeaveRequestDetails { get; set; } public DbSet<VF03leaveType> VF03LeaveTypes { get; set; } public DbSet<VF03OTRequest> VF03OTRequests { get; set; } public DbSet<VF03OTRequestDetail> VF03OTRequestDetails { get; set; } public DbSet<VF03OTSummary> VF03OTSummaries { get; set; } public DbSet<VF03LeaveBalance> VF03LeaveBalances { get; set; } public DbSet<VF03user> VF03Users { get; set; } public DbSet<VwCurrentlyPresentEmployee> VwCurrentlyPresentEmployees { get; set; } public DbSet<VwShiftCheckInOut> VwShiftCheckInOuts { get; set; }
+    public DbSet<F03PublicFormAnswer> PublicFormAnswers { get; set; }
+    public DbSet<F03HrmUserRoleRule> HrmUserRoleRules { get; set; }
+    public DbSet<F03BusinessRule> BusinessRules { get; set; }
+    public DbSet<F03CompanyHoliday> CompanyHolidays { get; set; }
+    public DbSet<F03WorkYear> WorkYears { get; set; }
+    public DbSet<F03EscalationLog> EscalationLogs { get; set; }
+    public DbSet<F03EscalationRule> EscalationRules { get; set; }
+    public DbSet<F03UserLog> UserLogs { get; set; }
+    public DbSet<VF03EmployeeApprover> VEmployeeApprovers { get; set; }
+    public DbSet<VF03employee> VF03Employees { get; set; }
+    public DbSet<vF03EmployeeAttendance> VF03EmployeeAttendances { get; set; }
+    public DbSet<VF03LeaveRequest> VF03LeaveRequests { get; set; }
+    public DbSet<VF03LeaveRequestDetail> VF03LeaveRequestDetails { get; set; }
+    public DbSet<VF03leaveType> VF03LeaveTypes { get; set; }
+    public DbSet<VF03OTRequest> VF03OTRequests { get; set; }
+    public DbSet<VF03OTRequestDetail> VF03OTRequestDetails { get; set; }
+    public DbSet<VF03OTSummary> VF03OTSummaries { get; set; }
+    public DbSet<VF03LeaveBalance> VF03LeaveBalances { get; set; }
+    public DbSet<VF03user> VF03Users { get; set; }
+    public DbSet<VwCurrentlyPresentEmployee> VwCurrentlyPresentEmployees { get; set; }
+    public DbSet<VwShiftCheckInOut> VwShiftCheckInOuts { get; set; }
+
+    public DbSet<F03EndpointDevice> EndpointDevices { get; set; }
+    public DbSet<F03EndpointSoftwareInventory> EndpointSoftwareInventory { get; set; }
+    public DbSet<F03EndpointServiceInventory> EndpointServiceInventory { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
         modelBuilder.Entity<VwShiftCheckInOut>(entity => { entity.HasNoKey(); entity.ToView("VwShiftCheckInOut"); });
+        modelBuilder.Entity<F03EndpointDevice>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.DeviceKey).IsUnique();
+            entity.HasIndex(x => x.SerialNumber);
+            entity.HasIndex(x => x.EquipmentAssetId);
+            entity.HasIndex(x => x.LastSeenUtc);
+            entity.HasMany(x => x.Software).WithOne().HasForeignKey(x => x.EndpointDeviceId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Services).WithOne().HasForeignKey(x => x.EndpointDeviceId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<F03EndpointSoftwareInventory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.EndpointDeviceId, x.NormalizedName });
+        });
+        modelBuilder.Entity<F03EndpointServiceInventory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.EndpointDeviceId, x.ServiceName });
+        });
         modelBuilder.Entity<F03StagingEmployee>().Property(x => x.TotalLeaveDays).HasPrecision(10, 2);
         modelBuilder.Entity<F03StagingOTType>().Property(x => x.RateMultiplier).HasPrecision(10, 2);
         modelBuilder.Entity<F03PayrollInput>(entity => { entity.Property(x => x.WorkMinutes).HasPrecision(10, 2); entity.Property(x => x.LeaveTotal).HasPrecision(10, 2); entity.Property(x => x.OTMinutes).HasPrecision(10, 2); });
@@ -86,22 +173,10 @@ public class FVNWEBAPPContext : DbContext
         modelBuilder.Entity<F03RoleFunction>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.IdRole, x.IdFunction }).IsUnique(); entity.HasOne(x => x.Role).WithMany(x => x.RoleFunctions).HasForeignKey(x => x.IdRole).OnDelete(DeleteBehavior.Cascade); entity.HasOne(x => x.Function).WithMany(x => x.RoleFunctions).HasForeignKey(x => x.IdFunction).OnDelete(DeleteBehavior.Cascade); });
         modelBuilder.Entity<F03UserRole>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.IdUser, x.IdRole }).IsUnique(); entity.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.IdUser).OnDelete(DeleteBehavior.Cascade); entity.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.IdRole).OnDelete(DeleteBehavior.Cascade); });
         modelBuilder.Entity<F03Role>(entity => entity.HasIndex(x => x.RoleCode).IsUnique());
-        modelBuilder.Entity<F03FeatureOperatorAssignment>(entity => { entity.HasKey(x => x.Id); entity.Property(x => x.EmployeeCode).HasMaxLength(50).IsRequired(); entity.Property(x => x.ResourceType).HasMaxLength(50).IsRequired(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.EmployeeCode }).IsUnique(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.IsActive });
-        });
+        modelBuilder.Entity<F03FeatureOperatorAssignment>(entity => { entity.HasKey(x => x.Id); entity.Property(x => x.EmployeeCode).HasMaxLength(50).IsRequired(); entity.Property(x => x.ResourceType).HasMaxLength(50).IsRequired(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.EmployeeCode }).IsUnique(); entity.HasIndex(x => new { x.FunctionCode, x.ResourceType, x.ResourceId, x.IsActive }); });
         modelBuilder.Entity<F03EmailDispatchPolicy>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => new { x.TemplateCode, x.Priority }).IsUnique(); entity.Property(x => x.DispatchMode).HasConversion<string>().HasMaxLength(30); });
-        modelBuilder.Entity<F03SecurityFunctionRegistryItem>(entity =>
-        {
-            entity.HasKey(x => x.Id);
-            entity.HasIndex(x => x.FunctionKey).IsUnique();
-            entity.Property(x => x.FunctionKey).IsRequired().HasMaxLength(150);
-            entity.Property(x => x.LifecycleStatus).IsRequired().HasMaxLength(30);
-            entity.Property(x => x.SourceType).IsRequired().HasMaxLength(30);
-            entity.Property(x => x.DefinitionHash).IsRequired().HasMaxLength(128);
-        });
-        modelBuilder.Entity<F03Function>(entity =>
-        {
-            entity.HasIndex(x => x.FunctionKey).IsUnique();
-        });
+        modelBuilder.Entity<F03SecurityFunctionRegistryItem>(entity => { entity.HasKey(x => x.Id); entity.HasIndex(x => x.FunctionKey).IsUnique(); entity.Property(x => x.FunctionKey).IsRequired().HasMaxLength(150); entity.Property(x => x.LifecycleStatus).IsRequired().HasMaxLength(30); entity.Property(x => x.SourceType).IsRequired().HasMaxLength(30); entity.Property(x => x.DefinitionHash).IsRequired().HasMaxLength(128); });
+        modelBuilder.Entity<F03Function>(entity => { entity.HasIndex(x => x.FunctionKey).IsUnique(); });
     }
 
     public override int SaveChanges() { ApplyAuditInfo(); return base.SaveChanges(); }
