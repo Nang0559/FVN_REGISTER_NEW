@@ -1,5 +1,5 @@
 using FVN_REGISTER.Application.Interfaces.Equipment;
-using FVN_REGISTER.Application.Interfaces.Security;
+using FvnAuthorizationService = FVN_REGISTER.Application.Interfaces.Security.IAuthorizationService;
 using FVN_REGISTER.Application.Interfaces.Users;
 using FVN_REGISTER.Contract.Dtos.Depts;
 using FVN_REGISTER.Contract.Dtos.EquipmentImport;
@@ -19,14 +19,11 @@ public sealed class EquipmentSchemaController : ControllerBase
     private readonly IEquipmentImportService _service;
     private readonly FVNWEBAPPContext _db;
     private readonly ICurrentUserService _currentUser;
-    private readonly IAuthorizationService _authorization;
+    private readonly FvnAuthorizationService _authorization;
 
-    public EquipmentSchemaController(IEquipmentImportService service, FVNWEBAPPContext db, ICurrentUserService currentUser, IAuthorizationService authorization)
+    public EquipmentSchemaController(IEquipmentImportService service, FVNWEBAPPContext db, ICurrentUserService currentUser, FvnAuthorizationService authorization)
     {
-        _service = service;
-        _db = db;
-        _currentUser = currentUser;
-        _authorization = authorization;
+        _service = service; _db = db; _currentUser = currentUser; _authorization = authorization;
     }
 
     [HttpGet("departments")]
@@ -36,16 +33,8 @@ public sealed class EquipmentSchemaController : ControllerBase
         var user = _currentUser.GetCurrentUser();
         if (user == null) return Unauthorized();
         var query = _db.Departments.AsNoTracking().Where(x => x.IsActive == true);
-        if (!user.IsAdmin && !string.IsNullOrWhiteSpace(user.DeptCode))
-            query = query.Where(x => x.DeptCode == user.DeptCode);
-        return Ok(await query.OrderBy(x => x.DeptCode).Select(x => new DepartmentDto
-        {
-            Id = x.Id,
-            DeptCode = x.DeptCode,
-            DeptName = x.DeptName,
-            IsActive = x.IsActive == true,
-            CreatedAt = x.CreatedAt
-        }).ToListAsync(ct));
+        if (!user.IsAdmin && !string.IsNullOrWhiteSpace(user.DeptCode)) query = query.Where(x => x.DeptCode == user.DeptCode);
+        return Ok(await query.OrderBy(x => x.DeptCode).Select(x => new DepartmentDto { Id=x.Id, DeptCode=x.DeptCode, DeptName=x.DeptName, IsActive=x.IsActive == true, CreatedAt=x.CreatedAt }).ToListAsync(ct));
     }
 
     [HttpGet]
