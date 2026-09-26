@@ -270,7 +270,18 @@ public sealed class FeatureOperatorAssignmentService : IFeatureOperatorAssignmen
         var type = NormalizeResourceType(resourceType);
         return type switch
         {
-            "PUBLIC_INFORMATION" => await _uow.Repository<F03PublicInformation>().Query().AsNoTracking().Where(x => x.IsActive == true).OrderByDescending(x => x.CreatedAt).Select(x => new FeatureOperatorResourceDto { Id = x.Id, Code = x.Id.ToString(), Name = x.Title, Status = x.Status }).ToListAsync(ct),
+            "PUBLIC_INFORMATION" => await _uow.Repository<F03PublicInformation>().Query().AsNoTracking()
+                // F03PublicInformation has no IsActive column in SQL; Archived is its inactive lifecycle state.
+                .Where(x => x.Status != "Archived")
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new FeatureOperatorResourceDto
+                {
+                    Id = x.Id,
+                    Code = x.Id.ToString(),
+                    Name = x.Title,
+                    Status = x.Status
+                })
+                .ToListAsync(ct),
             "PUBLIC_FORM" => await _uow.Repository<F03PublicForm>().Query().AsNoTracking().Where(x => x.IsActive == true).OrderByDescending(x => x.CreatedAt).Select(x => new FeatureOperatorResourceDto { Id = x.Id, Code = x.FormCode, Name = x.Title, Status = x.Status }).ToListAsync(ct),
             "EXECUTION_REVIEW" => new List<FeatureOperatorResourceDto>(),
             _ => throw new ArgumentException($"ResourceType không được hỗ trợ: {resourceType}")
