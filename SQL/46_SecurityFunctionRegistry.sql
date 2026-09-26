@@ -12,6 +12,7 @@ GO
   Discovery never grants/revokes a RoleFunction and never hard-deletes a function.
 */
 
+/* Phase 1: extend the legacy function catalog. */
 IF COL_LENGTH(N'dbo.F03Functions', N'FunctionKey') IS NULL
     ALTER TABLE dbo.F03Functions ADD FunctionKey nvarchar(150) NULL;
 IF COL_LENGTH(N'dbo.F03Functions', N'ModuleCode') IS NULL
@@ -28,9 +29,11 @@ IF COL_LENGTH(N'dbo.F03Functions', N'LastSeenAt') IS NULL
     ALTER TABLE dbo.F03Functions ADD LastSeenAt datetime2(0) NULL;
 IF COL_LENGTH(N'dbo.F03Functions', N'ReplacementFunctionKey') IS NULL
     ALTER TABLE dbo.F03Functions ADD ReplacementFunctionKey nvarchar(150) NULL;
+GO
 
 /* Backfill stable keys for all existing permission codes. Unknown legacy codes remain identifiable. */
-UPDATE f SET FunctionKey = CASE f.FunctionCode
+UPDATE f
+SET FunctionKey = CASE f.FunctionCode
     WHEN 2701 THEN N'Dashboard.View'
     WHEN 2001 THEN N'Leave.View'
     WHEN 2002 THEN N'Leave.Create'
@@ -120,18 +123,32 @@ UPDATE f SET FunctionKey = CASE f.FunctionCode
     WHEN 3094 THEN N'SecurityAccessChange.Execute'
     ELSE N'Legacy.' + CONVERT(nvarchar(20), f.FunctionCode)
 END
-WHERE NULLIF(LTRIM(RTRIM(FunctionKey)), N'') IS NULL;
+FROM dbo.F03Functions AS f
+WHERE NULLIF(LTRIM(RTRIM(f.FunctionKey)), N'') IS NULL;
+GO
 
-UPDATE dbo.F03Functions SET LastSeenAt = ISNULL(LastSeenAt, CreatedAt) WHERE LastSeenAt IS NULL;
-UPDATE dbo.F03Functions SET ScopeCode = N'Own' WHERE ScopeCode IS NULL;
+UPDATE f
+SET LastSeenAt = ISNULL(f.LastSeenAt, f.CreatedAt)
+FROM dbo.F03Functions AS f
+WHERE f.LastSeenAt IS NULL;
+GO
+
+UPDATE f
+SET ScopeCode = N'Own'
+FROM dbo.F03Functions AS f
+WHERE f.ScopeCode IS NULL;
+GO
 
 IF EXISTS (SELECT 1 FROM dbo.F03Functions GROUP BY FunctionKey HAVING COUNT(*) > 1)
     THROW 51460, N'F03Functions có FunctionKey trùng; cần xử lý trước khi tạo unique index.', 1;
+GO
 
 ALTER TABLE dbo.F03Functions ALTER COLUMN FunctionKey nvarchar(150) NOT NULL;
+GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.F03Functions') AND name = N'UX_F03Functions_FunctionKey')
     CREATE UNIQUE INDEX UX_F03Functions_FunctionKey ON dbo.F03Functions(FunctionKey);
+GO
 
 IF OBJECT_ID(N'dbo.F03SecurityFunctionRegistry',N'U') IS NULL
 BEGIN
@@ -162,11 +179,13 @@ BEGIN
         IsIgnored bit NOT NULL CONSTRAINT DF_F03SecurityFunctionRegistry_IsIgnored DEFAULT 0
     );
 END;
+GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.F03SecurityFunctionRegistry') AND name = N'UX_F03SecurityFunctionRegistry_FunctionKey')
     CREATE UNIQUE INDEX UX_F03SecurityFunctionRegistry_FunctionKey ON dbo.F03SecurityFunctionRegistry(FunctionKey);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.F03SecurityFunctionRegistry') AND name = N'IX_F03SecurityFunctionRegistry_Status')
     CREATE INDEX IX_F03SecurityFunctionRegistry_Status ON dbo.F03SecurityFunctionRegistry(LifecycleStatus, IsIgnored);
+GO
 
 /* Seed the registry from the existing function catalog without granting anything. */
 INSERT INTO dbo.F03SecurityFunctionRegistry
@@ -176,8 +195,15 @@ INSERT INTO dbo.F03SecurityFunctionRegistry
 )
 SELECT f.FunctionKey, f.FunctionCode, f.FunctionName, f.ModuleCode, f.ActionCode, f.ScopeCode,
        CASE WHEN f.LifecycleStatus IN (N'Retired',N'Replaced') THEN f.LifecycleStatus ELSE N'Active' END,
-       f.SourceType, CONVERT(varchar(128), HASHBYTES('SHA2_256', CONCAT(f.FunctionKey, N'|', f.FunctionCode, N'|', f.FunctionName)), 2),
-       f.CreatedAt, ISNULL(f.LastSeenAt,f.CreatedAt), 0
-FROM dbo.F03Functions f
-WHERE NOT EXISTS (SELECT 1 FROM dbo.F03SecurityFunctionRegistry r WHERE r.FunctionKey = f.FunctionKey);
+       f.SourceType,
+       CONVERT(varchar(128), HASHBYTES('SHA2_256', CONCAT(f.FunctionKey, N'|', f.FunctionCode, N'|', f.FunctionName)), 2),
+       f.CreatedAt,
+       ISNULL(f.LastSeenAt,f.CreatedAt),
+       0
+FROM dbo.F03Functions AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.F03SecurityFunctionRegistry AS r
+    WHERE r.FunctionKey = f.FunctionKey
+);
 GO
