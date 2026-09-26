@@ -139,6 +139,13 @@ FROM dbo.F03Functions AS f
 WHERE f.ScopeCode IS NULL;
 GO
 
+/* Equipment.Import is department-scoped; preserve this domain-specific authorization boundary. */
+UPDATE f
+SET ScopeCode = N'Department'
+FROM dbo.F03Functions AS f
+WHERE f.FunctionCode = 2306;
+GO
+
 IF EXISTS (SELECT 1 FROM dbo.F03Functions GROUP BY FunctionKey HAVING COUNT(*) > 1)
     THROW 51460, N'F03Functions có FunctionKey trùng; cần xử lý trước khi tạo unique index.', 1;
 GO
