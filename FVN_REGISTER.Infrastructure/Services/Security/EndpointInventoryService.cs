@@ -1,5 +1,7 @@
 using FVN_REGISTER.Application.Interfaces.Security;
 using FVN_REGISTER.Contract.Dtos.Security;
+using FVN_REGISTER.Core.Entities.Security;
+using FVN_REGISTER.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace FVN_REGISTER.Infrastructure.Services.Security;
@@ -12,12 +14,9 @@ public sealed class EndpointInventoryService : IEndpointInventoryService
 
     public async Task<EndpointInventorySummaryDto> UpsertInventoryAsync(EndpointInventoryRequestDto request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.DeviceKey))
-            throw new ArgumentException("DeviceKey is required.", nameof(request));
-        if (request.DeviceKey.Length > 100)
-            throw new ArgumentException("DeviceKey is too long.", nameof(request));
-        if (request.Software.Count > 5000 || request.Services.Count > 2000)
-            throw new ArgumentException("Inventory payload exceeds the supported limit.", nameof(request));
+        if (string.IsNullOrWhiteSpace(request.DeviceKey)) throw new ArgumentException("DeviceKey is required.", nameof(request));
+        if (request.DeviceKey.Length > 100) throw new ArgumentException("DeviceKey is too long.", nameof(request));
+        if (request.Software.Count > 5000 || request.Services.Count > 2000) throw new ArgumentException("Inventory payload exceeds the supported limit.", nameof(request));
 
         var deviceKey = request.DeviceKey.Trim();
         var device = await _db.EndpointDevices.SingleOrDefaultAsync(x => x.DeviceKey == deviceKey, cancellationToken);
@@ -36,18 +35,11 @@ public sealed class EndpointInventoryService : IEndpointInventoryService
         device.LastSeenUtc = DateTime.UtcNow;
         device.Status = "Online";
         device.Source = "FVNAgent";
-        if (request.EquipmentAssetId.HasValue)
-        {
-            var assetExists = await _db.EquipmentAssets.AsNoTracking().AnyAsync(x => x.Id == request.EquipmentAssetId.Value, cancellationToken);
-            if (assetExists) device.EquipmentAssetId = request.EquipmentAssetId;
-        }
+        if (request.EquipmentAssetId.HasValue && await _db.EquipmentAssets.AsNoTracking().AnyAsync(x => x.Id == request.EquipmentAssetId.Value, cancellationToken)) device.EquipmentAssetId = request.EquipmentAssetId;
         device.UpdatedAt = DateTime.UtcNow;
 
-        // A complete snapshot is authoritative for the current state. Replacing the
-        // child rows prevents stale software/service records from surviving removal.
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
-
         var oldSoftware = await _db.EndpointSoftwareInventory.Where(x => x.EndpointDeviceId == device.Id).ToListAsync(cancellationToken);
         var oldServices = await _db.EndpointServiceInventory.Where(x => x.EndpointDeviceId == device.Id).ToListAsync(cancellationToken);
         _db.EndpointSoftwareInventory.RemoveRange(oldSoftware);
@@ -55,40 +47,13 @@ public sealed class EndpointInventoryService : IEndpointInventoryService
 
         var detectedAt = DateTime.UtcNow;
         foreach (var item in request.Software.Where(x => !string.IsNullOrWhiteSpace(x.Name)).GroupBy(x => Normalize(x.Name), StringComparer.OrdinalIgnoreCase).Select(x => x.First()))
-        {
-            _db.EndpointSoftwareInventory.Add(new F03EndpointSoftwareInventory
-            {
-                EndpointDeviceId = device.Id,
-                NormalizedName = Normalize(item.Name),
-                DisplayName = Trim(item.DisplayName ?? item.Name, 255),
-                Publisher = Trim(item.Publisher, 255),
-                Version = Trim(item.Version, 100),
-                Architecture = Trim(item.Architecture, 30),
-                InstallDate = item.InstallDate,
-                InstallLocation = Trim(item.InstallLocation, 1000),
-                DetectedAtUtc = detectedAt,
-                Source = "FVNAgent"
-            });
-        }
+            _db.EndpointSoftwareInventory.Add(new F03EndpointSoftwareInventory { EndpointDeviceId = device.Id, NormalizedName = Normalize(item.Name), DisplayName = Trim(item.DisplayName ?? item.Name, 255), Publisher = Trim(item.Publisher, 255), Version = Trim(item.Version, 100), Architecture = Trim(item.Architecture, 30), InstallDate = item.InstallDate, InstallLocation = Trim(item.InstallLocation, 1000), DetectedAtUtc = detectedAt, Source = "FVNAgent" });
 
         foreach (var item in request.Services.Where(x => !string.IsNullOrWhiteSpace(x.ServiceName)).GroupBy(x => x.ServiceName.Trim(), StringComparer.OrdinalIgnoreCase).Select(x => x.First()))
-        {
-            _db.EndpointServiceInventory.Add(new F03EndpointServiceInventory
-            {
-                EndpointDeviceId = device.Id,
-                ServiceName = Trim(item.ServiceName, 255)!,
-                DisplayName = Trim(item.DisplayName, 255),
-                State = Trim(item.State, 30),
-                StartMode = Trim(item.StartMode, 30),
-                BinaryPathHash = Trim(item.BinaryPathHash, 128),
-                DetectedAtUtc = detectedAt,
-                Source = "FVNAgent"
-            });
-        }
+            _db.EndpointServiceInventory.Add(new F03EndpointServiceInventory { EndpointDeviceId = device.Id, ServiceName = Trim(item.ServiceName, 255)!, DisplayName = Trim(item.DisplayName, 255), State = Trim(item.State, 30), StartMode = Trim(item.StartMode, 30), BinaryPathHash = Trim(item.BinaryPathHash, 128), DetectedAtUtc = detectedAt, Source = "FVNAgent" });
 
         await _db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
-
         return await ToSummaryAsync(device.Id, cancellationToken);
     }
 
