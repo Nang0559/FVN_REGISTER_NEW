@@ -45,6 +45,7 @@ public static class SecurityFunctionCodes
     public const int EquipmentInspectionApprove = 2317;
     public const int EquipmentInspectionReport = 2318;
     public const int EquipmentManage = 2319;
+    public const int EquipmentFormManage = 2320;
 
     public const int UserManagementView = 2401;
     public const int UserManagementCreate = 2402;
