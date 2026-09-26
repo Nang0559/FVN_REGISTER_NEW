@@ -564,6 +564,7 @@ public sealed class AuthorizationService : BaseService<AuthorizationService>, IA
             join f in _uow.Repository<F03Function>().Query().AsNoTracking()
                 on rf.IdFunction equals f.Id
             where roleIds.Contains(rf.IdRole)
+                && (f.IsActive ?? true)
             select new { rf.IdRole, f.FunctionCode }
         ).ToListAsync(ct);
 
@@ -722,7 +723,19 @@ public sealed class AuthorizationService : BaseService<AuthorizationService>, IA
             .ToListAsync(ct);
 
         if (functions.Count != codes.Count)
-            throw new InvalidOperationException("Một hoặc nhiều function không tồn tại hoặc đã ngừng hoạt động.");
+        {
+            var validCodes = functions
+                .Select(x => x.FunctionCode)
+                .ToHashSet();
+
+            var invalidCodes = codes
+                .Where(x => !validCodes.Contains(x))
+                .OrderBy(x => x)
+                .ToList();
+
+            throw new InvalidOperationException(
+                $"Function không tồn tại hoặc đã ngừng hoạt động: {string.Join(", ", invalidCodes)}.");
+        }
 
         var repo = _uow.Repository<F03RoleFunction>();
         var existing = await repo.Query().Where(x => x.IdRole == role.Id).ToListAsync(ct);
