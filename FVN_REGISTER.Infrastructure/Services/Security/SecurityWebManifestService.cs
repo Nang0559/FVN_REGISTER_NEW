@@ -32,8 +32,8 @@ public sealed class SecurityWebManifestService
         var existing = await _db.SecurityFunctionRegistry
             .Where(x => x.SourceType == "WebManifest")
             .ToListAsync(ct);
-        var existingByKey = existing.ToDictionary(x => x.FunctionKey, StringComparer.OrdinalIgnoreCase);
-        var currentByKey = existing.Where(x => keys.Contains(x.FunctionKey))
+        var currentByKey = existing
+            .Where(x => keys.Contains(x.FunctionKey))
             .ToDictionary(x => x.FunctionKey, StringComparer.OrdinalIgnoreCase);
 
         var registered = await _db.Functions
@@ -55,7 +55,7 @@ public sealed class SecurityWebManifestService
             var isRegistered = registeredByKey.TryGetValue(key, out var function);
             var status = isRegistered && string.Equals(function!.LifecycleStatus, "Active", StringComparison.OrdinalIgnoreCase)
                 ? "Active"
-                : "PendingReview";
+                : "PendingRegistration";
 
             if (!currentByKey.TryGetValue(key, out var item))
             {
@@ -77,7 +77,6 @@ public sealed class SecurityWebManifestService
                 };
                 _db.SecurityFunctionRegistry.Add(item);
                 currentByKey[key] = item;
-                existingByKey[key] = item;
                 added++;
             }
             else
@@ -103,14 +102,14 @@ public sealed class SecurityWebManifestService
                 }
                 else if (item.LifecycleStatus is "Retired" or "Replaced" or "PendingRetirement")
                 {
-                    item.LifecycleStatus = "PendingReview";
+                    item.LifecycleStatus = "PendingRegistration";
                     item.ReplacementFunctionKey = null;
                     item.ResolvedAt = null;
                     updated++;
                 }
                 else
                 {
-                    item.LifecycleStatus = "PendingReview";
+                    item.LifecycleStatus = "PendingRegistration";
                     item.ResolvedAt = null;
                     updated++;
                 }
