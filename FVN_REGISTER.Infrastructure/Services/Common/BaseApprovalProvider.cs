@@ -45,193 +45,88 @@ public abstract class BaseApprovalProvider<TSubject, TProvider> : BaseService<TP
 
     public abstract RequestModule RequestType { get; }
 
-    /// <summary>
-    /// Legacy hierarchy API. Command flows should use the ServiceResult overload
-    /// so business/configuration errors are returned to the caller instead of thrown.
-    /// </summary>
-    public virtual async Task<List<ApprovalStepSnapshotDto>> BuildHierarchyAsync(
-        ApprovalBuildContext ctx,
-        CancellationToken ct)
+    public virtual async Task<List<ApprovalStepSnapshotDto>> BuildHierarchyAsync(ApprovalBuildContext ctx, CancellationToken ct)
     {
         var result = await BuildHierarchyResultAsync(ctx, ct, strict: true);
-        return result.Success && result.Data != null
-            ? result.Data
-            : new List<ApprovalStepSnapshotDto>();
+        return result.Success && result.Data != null ? result.Data : new List<ApprovalStepSnapshotDto>();
     }
 
-    public virtual async Task<ServiceResult<List<ApprovalStepSnapshotDto>>> BuildHierarchyResultAsync(
-        ApprovalBuildContext ctx,
-        CancellationToken ct,
-        bool strict = true)
+    public virtual async Task<ServiceResult<List<ApprovalStepSnapshotDto>>> BuildHierarchyResultAsync(ApprovalBuildContext ctx, CancellationToken ct, bool strict = true)
     {
-        var routeResult = await _routeService.GetPreviewAsync(
-            RequestType, ctx.EmployeeCode, ct);
-
+        var routeResult = await _routeService.GetPreviewAsync(RequestType, ctx.EmployeeCode, ct);
         if (!routeResult.Success || routeResult.Data == null)
         {
             if (!strict)
             {
-                Logger.LogWarning(
-                    "Approval route unavailable for {RequestType}, EmployeeCode={EmployeeCode}, DeptCode={DeptCode}, PositionCode={PositionCode}: {Message}",
-                    RequestType, ctx.EmployeeCode, ctx.DeptCode, ctx.PositionCode, routeResult.Message);
-
-                return ServiceResult<List<ApprovalStepSnapshotDto>>.Ok(
-                    new List<ApprovalStepSnapshotDto>(), routeResult.Message);
+                Logger.LogWarning("Approval route unavailable for {RequestType}, EmployeeCode={EmployeeCode}, DeptCode={DeptCode}, PositionCode={PositionCode}: {Message}", RequestType, ctx.EmployeeCode, ctx.DeptCode, ctx.PositionCode, routeResult.Message);
+                return ServiceResult<List<ApprovalStepSnapshotDto>>.Ok(new List<ApprovalStepSnapshotDto>(), routeResult.Message);
             }
-
-            return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(
-                routeResult.Message ??
-                $"Không xác định được luồng phê duyệt cho {RequestType}.");
+            return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(routeResult.Message ?? $"Không xác định được luồng phê duyệt cho {RequestType}.");
         }
 
         var route = routeResult.Data;
-
-        var selections = await _selectionService.GetAsync(
-            RequestType, ctx.RequestId, ct);
-
-        var selectedByLevel = selections
-            .GroupBy(x => x.Level)
-            .ToDictionary(x => x.Key, x => x.Last().ApproverCode);
-
+        var selections = await _selectionService.GetAsync(RequestType, ctx.RequestId, ct);
+        var selectedByLevel = selections.GroupBy(x => x.Level).ToDictionary(x => x.Key, x => x.Last().ApproverCode);
         var result = new List<ApprovalStepSnapshotDto>();
 
-        foreach (var level in route.Levels
-            .OrderBy(x => x.Sequence)
-            .ThenBy(x => x.Level))
+        foreach (var level in route.Levels.OrderBy(x => x.Sequence).ThenBy(x => x.Level))
         {
             if (level.Candidates.Count == 0)
             {
-                var message =
-                    $"Không tìm thấy người phê duyệt cho {RequestType}, " +
-                    $"{level.LevelName} (Level {level.Level}).";
-
-                if (!strict)
-                {
-                    Logger.LogWarning(
-                        "{Message} EmployeeCode={EmployeeCode}, DeptCode={DeptCode}, PositionCode={PositionCode}",
-                        message, ctx.EmployeeCode, ctx.DeptCode, ctx.PositionCode);
-                    continue;
-                }
-
+                var message = $"Không tìm thấy người phê duyệt cho {RequestType}, {level.LevelName} (Level {level.Level}).";
+                if (!strict) { Logger.LogWarning("{Message}", message); continue; }
                 return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(message);
             }
 
-            if (!selectedByLevel.TryGetValue(level.Level, out var selectedCode) ||
-                string.IsNullOrWhiteSpace(selectedCode))
+            if (!selectedByLevel.TryGetValue(level.Level, out var selectedCode) || string.IsNullOrWhiteSpace(selectedCode))
             {
-                // Required levels must have a selected approver. Optional levels
-                // may remain unselected and therefore do not enter the snapshot.
-                if (!level.Required)
-                    continue;
-
-                var message =
-                    $"Chưa chọn người phê duyệt cho {RequestType}, " +
-                    $"{level.LevelName} (Level {level.Level}).";
-
-                if (!strict)
-                {
-                    Logger.LogDebug(
-                        "{Message} RequestId={RequestId}", message, ctx.RequestId);
-                    continue;
-                }
-
+                if (!level.Required) continue;
+                var message = $"Chưa chọn người phê duyệt cho {RequestType}, {level.LevelName} (Level {level.Level}).";
+                if (!strict) { Logger.LogDebug("{Message} RequestId={RequestId}", message, ctx.RequestId); continue; }
                 return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(message);
             }
 
-            var selected = level.Candidates.FirstOrDefault(
-                x => string.Equals(
-                    x.ApproverCode, selectedCode, StringComparison.OrdinalIgnoreCase));
-
+            var selected = level.Candidates.FirstOrDefault(x => string.Equals(x.ApproverCode, selectedCode, StringComparison.OrdinalIgnoreCase));
             if (selected == null)
             {
-                var message =
-                    $"Người phê duyệt [{selectedCode}] không thuộc danh sách hợp lệ " +
-                    $"của {RequestType}, Level {level.Level}.";
-
-                if (!strict)
-                {
-                    Logger.LogWarning(
-                        "{Message} RequestId={RequestId}", message, ctx.RequestId);
-                    continue;
-                }
-
+                var message = $"Người phê duyệt [{selectedCode}] không thuộc danh sách hợp lệ của {RequestType}, Level {level.Level}.";
+                if (!strict) { Logger.LogWarning("{Message} RequestId={RequestId}", message, ctx.RequestId); continue; }
                 return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(message);
             }
 
-            result.Add(new ApprovalStepSnapshotDto(
-                level.Level,
-                level.LevelName,
-                level.RoleName,
-                selected.ApproverCode,
-                selected.ApproverName,
-                selected.ApproverEmail,
-                level.Required));
+            result.Add(new ApprovalStepSnapshotDto(level.Level, level.LevelName, level.RoleName, selected.ApproverCode, selected.ApproverName, selected.ApproverEmail, level.Required));
         }
 
         if (result.Count == 0)
         {
-            var message =
-                $"Không xác định được cấp phê duyệt cho " +
-                $"{RequestType} / chức vụ {ctx.PositionCode}.";
-
-            if (!strict)
-            {
-                Logger.LogWarning("{Message}", message);
-                return ServiceResult<List<ApprovalStepSnapshotDto>>.Ok(result, message);
-            }
-
+            var message = $"Không xác định được cấp phê duyệt cho {RequestType} / chức vụ {ctx.PositionCode}.";
+            if (!strict) return ServiceResult<List<ApprovalStepSnapshotDto>>.Ok(result, message);
             return ServiceResult<List<ApprovalStepSnapshotDto>>.Fail(message);
         }
 
         return ServiceResult<List<ApprovalStepSnapshotDto>>.Ok(result);
     }
 
-    public virtual async Task<ApprovalSnapshotDto> BuildSnapshotAsync(
-        TSubject subject,
-        ApprovalBuildContext ctx,
-        CancellationToken ct)
+    public virtual async Task<ApprovalSnapshotDto> BuildSnapshotAsync(TSubject subject, ApprovalBuildContext ctx, CancellationToken ct)
     {
         var result = await BuildSnapshotResultAsync(subject, ctx, ct);
-        return result.Data ?? new ApprovalSnapshotDto(
-            subject.RequestId,
-            RequestType,
-            DateTime.Now,
-            new List<ApprovalStepSnapshotDto>());
+        return result.Data ?? new ApprovalSnapshotDto(subject.RequestId, RequestType, DateTime.Now, new List<ApprovalStepSnapshotDto>(), ctx.EmployeeCode);
     }
 
-    public virtual async Task<ServiceResult<ApprovalSnapshotDto>> BuildSnapshotResultAsync(
-        TSubject subject,
-        ApprovalBuildContext ctx,
-        CancellationToken ct)
+    public virtual async Task<ServiceResult<ApprovalSnapshotDto>> BuildSnapshotResultAsync(TSubject subject, ApprovalBuildContext ctx, CancellationToken ct)
     {
         var hierarchy = await BuildHierarchyResultAsync(ctx, ct, strict: true);
         if (!hierarchy.Success || hierarchy.Data == null)
-            return ServiceResult<ApprovalSnapshotDto>.Fail(
-                hierarchy.Message ?? $"Không thể khởi tạo luồng duyệt cho {RequestType}.");
+            return ServiceResult<ApprovalSnapshotDto>.Fail(hierarchy.Message ?? $"Không thể khởi tạo luồng duyệt cho {RequestType}.");
 
-        return ServiceResult<ApprovalSnapshotDto>.Ok(
-            new ApprovalSnapshotDto(
-                subject.RequestId,
-                RequestType,
-                DateTime.Now,
-                hierarchy.Data));
+        return ServiceResult<ApprovalSnapshotDto>.Ok(new ApprovalSnapshotDto(subject.RequestId, RequestType, DateTime.Now, hierarchy.Data, ctx.EmployeeCode));
     }
 
-    protected async Task NotifyEmployeeInAppAsync(
-        TSubject subject,
-        ApprovalStatus status,
-        CancellationToken ct)
+    protected async Task NotifyEmployeeInAppAsync(TSubject subject, ApprovalStatus status, CancellationToken ct)
     {
         var creatorUserId = await _userResolver.ResolveUserIdAsync(subject.EmployeeCode, ct);
         if (creatorUserId is null or <= 0) return;
-
-        await _notification.NotifyCreatorInAppAsync(
-            creatorUserId.Value,
-            subject.EmployeeCode,
-            status.ToString(),
-            subject.RequestId,
-            RequestType,
-            ct);
+        await _notification.NotifyCreatorInAppAsync(creatorUserId.Value, subject.EmployeeCode, status.ToString(), subject.RequestId, RequestType, ct);
     }
 
     public abstract Task<TSubject?> GetSubjectAsync(int requestId, CancellationToken ct);
