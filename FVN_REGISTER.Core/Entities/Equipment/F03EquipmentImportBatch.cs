@@ -6,6 +6,8 @@ namespace FVN_REGISTER.Core.Entities.Equipment;
 [Table("F03EquipmentImportBatches")]
 public sealed class F03EquipmentImportBatch : BaseAuditEntity
 {
+    public int? SchemaId { get; set; }
+
     [Required, StringLength(20)] public string DeptCode { get; set; } = string.Empty;
     [Required, StringLength(260)] public string FileName { get; set; } = string.Empty;
     [Required, StringLength(30)] public string Status { get; set; } = "Staged";
@@ -15,4 +17,6 @@ public sealed class F03EquipmentImportBatch : BaseAuditEntity
     public int ImportedRows { get; set; }
     public bool AssignToEmployee { get; set; }
     public DateTime? CompletedAt { get; set; }
+
+    public F03EquipmentSchema? Schema { get; set; }
 }
