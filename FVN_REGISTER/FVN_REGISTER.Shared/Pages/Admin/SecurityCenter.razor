@@ -6,6 +6,7 @@
 @using FVN_REGISTER.Shared.Services.Security
 @using FVN_REGISTER.Shared.Services.Users
 @using FVN_REGISTER.Shared.Utils.Helpers
+@using FVN_REGISTER.Core.Constants
 @using Microsoft.AspNetCore.Authorization
 @inherits AppComponentBase
 @inject ISecurityClientService SecurityService
@@ -564,7 +565,8 @@
     private const int ManageTwoFactorFunctionCode = 2407;
 
     private bool CanManageTwoFactor
-        => _myPermissions?.Has(ManageTwoFactorFunctionCode) == true;
+        => _myPermissions?.PermissionCode == UserPermissionCodes.SuperAdmin
+           && _myPermissions.Has(ManageTwoFactorFunctionCode);
 
     private IEnumerable<TwoFactorAdminUserDto> FilteredTwoFactorUsers =>
         string.IsNullOrWhiteSpace(_twoFactorSearch)
