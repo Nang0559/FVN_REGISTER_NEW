@@ -82,14 +82,8 @@ public sealed class SecurityCandidateDiscovery
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(x => !x.IsDynamic))
         {
             Type[] types;
-            try
-            {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types.Where(x => x is not null).Cast<Type>().ToArray();
-            }
+            try { types = assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(x => x is not null).Cast<Type>().ToArray(); }
 
             var componentTypes = types
                 .Where(x => !x.IsAbstract && typeof(ComponentBase).IsAssignableFrom(x))
@@ -128,29 +122,24 @@ public sealed class SecurityCandidateDiscovery
             }
         }
 
-        // API candidates can be retired only when an API endpoint scan was actually available.
-        // A split Web deployment must never retire UI candidates merely because Web assemblies
-        // are not loaded into the API process.
         if (apiScanAvailable)
         {
             foreach (var item in registry.Values.Where(x =>
                          x.SourceType == "ApiEndpointCandidate" &&
                          !seenApi.Contains(x.FunctionKey) &&
-                         x.LifecycleStatus == "PendingReview"))
+                         x.LifecycleStatus == "PendingRegistration"))
             {
                 item.LifecycleStatus = "PendingRetirement";
                 item.ResolvedAt = null;
             }
         }
 
-        // UI candidates are retired only when this process actually scanned at least one
-        // Blazor component assembly. Otherwise their absence is not evidence of removal.
         if (uiAssembliesScanned > 0)
         {
             foreach (var item in registry.Values.Where(x =>
                          x.SourceType == "UiActionCandidate" &&
                          !seenUi.Contains(x.FunctionKey) &&
-                         x.LifecycleStatus == "PendingReview"))
+                         x.LifecycleStatus == "PendingRegistration"))
             {
                 item.LifecycleStatus = "PendingRetirement";
                 item.ResolvedAt = null;
@@ -186,7 +175,7 @@ public sealed class SecurityCandidateDiscovery
                 ModuleCode = module,
                 ActionCode = action,
                 ScopeCode = "Review",
-                LifecycleStatus = "PendingReview",
+                LifecycleStatus = "PendingRegistration",
                 SourceType = sourceType,
                 SourceAssembly = sourceAssembly,
                 SourceTypeName = sourceTypeName,
@@ -207,7 +196,7 @@ public sealed class SecurityCandidateDiscovery
         item.SourceTypeName = sourceTypeName;
 
         if (item.LifecycleStatus is not ("Ignored" or "Retired" or "Replaced"))
-            item.LifecycleStatus = "PendingReview";
+            item.LifecycleStatus = "PendingRegistration";
     }
 
     private static string TrimControllerSuffix(string name) =>
