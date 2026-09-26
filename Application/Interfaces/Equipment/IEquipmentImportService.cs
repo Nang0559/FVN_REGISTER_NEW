@@ -15,7 +15,6 @@ public interface IEquipmentImportService
     Task<EquipmentSchemaFromExcelDto> PreviewSchemaFromExcelAsync(string deptCode, string fileName, Stream content, CancellationToken ct = default);
     Task<EquipmentSchemaDto> CreateSchemaFromExcelAsync(string deptCode, string fileName, Stream content, string? schemaName, CancellationToken ct = default);
 
-    Task<EquipmentImportBatchDto> StageExcelAsync(string deptCode, string fileName, Stream content, bool assignToEmployee = false, CancellationToken ct = default);
     Task<EquipmentImportBatchDto> StageExcelAsync(string deptCode, int? schemaId, string fileName, Stream content, bool assignToEmployee = false, CancellationToken ct = default);
     Task<EquipmentImportBatchDto?> GetBatchAsync(int batchId, CancellationToken ct = default);
     Task<EquipmentImportCommitResultDto> CommitAsync(int batchId, CancellationToken ct = default);
