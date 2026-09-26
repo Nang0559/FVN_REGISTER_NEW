@@ -2,6 +2,7 @@ using FVN_REGISTER.Contract.Dtos.Depts;
 using FVN_REGISTER.Contract.Dtos.Equipment;
 using FVN_REGISTER.Contract.Dtos.EquipmentForms;
 using FVN_REGISTER.Contract.Dtos.EquipmentImport;
+using FVN_REGISTER.Contract.Dtos.PublicForms;
 using FVN_REGISTER.Contract.Responses;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -55,9 +56,9 @@ public interface IEquipmentClientService
     Task<ApiResponse<EquipmentInspectionTaskDto>> RejectInspectionAsync(int id, string reason, CancellationToken ct = default);
     Task<ApiResponse<EquipmentInspectionDashboardDto>> GetInspectionDashboardAsync(DateTime from, DateTime to, string? deptCode = null, CancellationToken ct = default);
     Task<ApiResponse<EquipmentInspectionEvidenceDto>> UploadInspectionEvidenceAsync(int taskId, int itemId, IBrowserFile file, CancellationToken ct = default);
-
     Task<ApiResponse<List<EquipmentApplicableFormDto>>> GetApplicableFormsAsync(int assetId, CancellationToken ct = default);
     Task<ApiResponse<List<EquipmentFormAssignmentDto>>> GetEquipmentFormAssignmentsAsync(string equipmentSchemaKey, CancellationToken ct = default);
+    Task<ApiResponse<List<PublicFormDto>>> GetEquipmentFormCatalogAsync(CancellationToken ct = default);
     Task<ApiResponse<EquipmentFormAssignmentDto>> AssignEquipmentFormAsync(EquipmentFormAssignmentRequest request, CancellationToken ct = default);
     Task<ApiResponse<bool>> RemoveEquipmentFormAssignmentAsync(int assignmentId, CancellationToken ct = default);
     Task<ApiResponse<EquipmentFormSubmissionDto>> SubmitEquipmentFormAsync(EquipmentFormSubmissionRequest request, CancellationToken ct = default);
