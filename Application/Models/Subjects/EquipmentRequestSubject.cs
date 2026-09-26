@@ -15,6 +15,9 @@ public sealed class EquipmentRequestSubject : IApprovalSubject
     public ApprovalStatus OverallStatus { get; set; }
     public EquipmentRequestKind RequestKind { get; set; }
     public int? AssetId { get; set; }
+    public int? FormId { get; set; }
+    public int? FormSubmissionId { get; set; }
+    public string? FormCode { get; set; }
     public string EquipmentName { get; set; } = string.Empty;
     public string? AssetCode { get; set; }
     public string SelectedApproverCode { get; set; } = string.Empty;
@@ -31,6 +34,9 @@ public sealed class EquipmentRequestSubject : IApprovalSubject
         OverallStatus = x.RequestStatus,
         RequestKind = x.RequestKind,
         AssetId = x.AssetId,
+        FormId = x.FormId,
+        FormSubmissionId = x.FormSubmissionId,
+        FormCode = x.FormCode,
         EquipmentName = x.EquipmentName,
         AssetCode = x.AssetCode,
         SelectedApproverCode = x.SelectedApproverCode,
