@@ -7,6 +7,7 @@ namespace FVN_REGISTER.Core.Enums
         Trip,
         Equipment,
         Attendance,
+        Payroll,
         AccessChange
     }
 }
