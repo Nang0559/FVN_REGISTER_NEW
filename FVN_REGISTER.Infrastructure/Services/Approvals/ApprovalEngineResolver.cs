@@ -1,7 +1,5 @@
-
 using FVN_REGISTER.Contract.Dtos.Approvals;
 using FVN_REGISTER.Contract.Responses;
-
 
 namespace FVN_REGISTER.Infrastructure.Services.Approvals;
 
@@ -11,10 +9,21 @@ public sealed class ApprovalEngineResolver : IApprovalEngineResolver
     private readonly IApprovalEngine<OTRequestSubject> _ot;
     private readonly IApprovalEngine<TripRequestSubject> _trip;
     private readonly IApprovalEngine<EquipmentRequestSubject> _equipment;
+    private readonly IApprovalEngine<PayrollPeriodSubject> _payroll;
 
-    public ApprovalEngineResolver(IApprovalEngine<LeaveRequestSubject> leave, IApprovalEngine<OTRequestSubject> ot,
-        IApprovalEngine<TripRequestSubject> trip, IApprovalEngine<EquipmentRequestSubject> equipment)
-    { _leave = leave; _ot = ot; _trip = trip; _equipment = equipment; }
+    public ApprovalEngineResolver(
+        IApprovalEngine<LeaveRequestSubject> leave,
+        IApprovalEngine<OTRequestSubject> ot,
+        IApprovalEngine<TripRequestSubject> trip,
+        IApprovalEngine<EquipmentRequestSubject> equipment,
+        IApprovalEngine<PayrollPeriodSubject> payroll)
+    {
+        _leave = leave;
+        _ot = ot;
+        _trip = trip;
+        _equipment = equipment;
+        _payroll = payroll;
+    }
 
     public Task<ApprovalActionResult> ProcessDecisionAsync(RequestModule module, ApprovalActionDto action, CancellationToken ct)
         => module switch
@@ -23,6 +32,7 @@ public sealed class ApprovalEngineResolver : IApprovalEngineResolver
             RequestModule.Overtime => _ot.ProcessDecisionAsync(action, ct),
             RequestModule.Trip => _trip.ProcessDecisionAsync(action, ct),
             RequestModule.Equipment => _equipment.ProcessDecisionAsync(action, ct),
+            RequestModule.Payroll => _payroll.ProcessDecisionAsync(action, ct),
             _ => throw new NotSupportedException($"Approval module {module} chưa được hỗ trợ.")
         };
 
@@ -33,6 +43,7 @@ public sealed class ApprovalEngineResolver : IApprovalEngineResolver
             RequestModule.Overtime => _ot.GetPendingForApproverAsync(approverEmail, ct),
             RequestModule.Trip => _trip.GetPendingForApproverAsync(approverEmail, ct),
             RequestModule.Equipment => _equipment.GetPendingForApproverAsync(approverEmail, ct),
+            RequestModule.Payroll => _payroll.GetPendingForApproverAsync(approverEmail, ct),
             _ => throw new NotSupportedException($"Approval module {module} chưa được hỗ trợ.")
         };
 }
