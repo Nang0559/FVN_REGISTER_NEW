@@ -9,33 +9,60 @@ public sealed class EndpointWorker : BackgroundService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<EndpointWorker> _logger;
     private readonly EndpointAgentOptions _options;
-    private readonly EndpointCollector _collector = new();
+    private readonly EndpointCollector _collector;
 
-    public EndpointWorker(IHttpClientFactory httpClientFactory, IOptions<EndpointAgentOptions> options, ILogger<EndpointWorker> logger)
+    public EndpointWorker(
+        IHttpClientFactory httpClientFactory,
+        IOptions<EndpointAgentOptions> options,
+        EndpointCollector collector,
+        ILogger<EndpointWorker> logger)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
+        _collector = collector;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.DeviceKey) || string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (string.IsNullOrWhiteSpace(_options.DeviceKey) || string.IsNullOrWhiteSpace(_options.ApiKeyProtected))
         {
-            _logger.LogError("Endpoint Agent is not configured: DeviceKey and ApiKey are required.");
+            _logger.LogError("Endpoint Agent is not configured: DeviceKey and ApiKeyProtected are required.");
+            return;
+        }
+
+        string apiKey;
+        try
+        {
+            apiKey = WindowsSecretStore.Unprotect(_options.ApiKeyProtected);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Endpoint Agent credential cannot be decrypted on this Windows machine.");
             return;
         }
 
         var delay = TimeSpan.FromMinutes(Math.Clamp(_options.IntervalMinutes, 5, 1440));
         while (!stoppingToken.IsCancellationRequested)
         {
-            try { await SendInventoryAsync(stoppingToken); }
-            catch (Exception ex) { _logger.LogError(ex, "Endpoint inventory synchronization failed."); }
+            try
+            {
+                await SendInventoryAsync(apiKey, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Endpoint inventory synchronization failed.");
+            }
+
             await Task.Delay(delay, stoppingToken);
         }
     }
 
-    private async Task SendInventoryAsync(CancellationToken cancellationToken)
+    private async Task SendInventoryAsync(string apiKey, CancellationToken cancellationToken)
     {
         var request = new EndpointInventoryRequestDto(
             _options.DeviceKey.Trim(),
@@ -51,14 +78,15 @@ public sealed class EndpointWorker : BackgroundService
 
         using var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(_options.ApiBaseUrl.TrimEnd('/') + "/");
-        client.DefaultRequestHeaders.Remove("X-FVN-Device-Key");
-        client.DefaultRequestHeaders.Remove("X-FVN-Device-Api-Key");
         client.DefaultRequestHeaders.Add("X-FVN-Device-Key", request.DeviceKey);
-        client.DefaultRequestHeaders.Add("X-FVN-Device-Api-Key", _options.ApiKey);
+        client.DefaultRequestHeaders.Add("X-FVN-Device-Api-Key", apiKey);
 
         using var response = await client.PostAsJsonAsync("api/security/endpoints/inventory", request, cancellationToken);
         response.EnsureSuccessStatusCode();
-        _logger.LogInformation("Endpoint inventory synchronized. Software={SoftwareCount}, Services={ServiceCount}.", request.Software.Count, request.Services.Count);
+        _logger.LogInformation(
+            "Endpoint inventory synchronized. Software={SoftwareCount}, Services={ServiceCount}.",
+            request.Software.Count,
+            request.Services.Count);
     }
 
     private static string? GetSerialNumber()
@@ -68,6 +96,9 @@ public sealed class EndpointWorker : BackgroundService
             using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS");
             return key?.GetValue("SystemSerialNumber")?.ToString();
         }
-        catch { return null; }
+        catch
+        {
+            return null;
+        }
     }
 }
