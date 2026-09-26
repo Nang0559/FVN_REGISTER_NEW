@@ -139,6 +139,19 @@ FROM dbo.F03Functions AS f
 WHERE f.ScopeCode IS NULL;
 GO
 
+/*
+  Capability-specific scope overrides.
+  Equipment.Import is a department-scoped capability by design:
+  the importer may work only inside the department authorized by RBAC.
+  The legacy fallback above intentionally uses Own for unknown functions,
+  so explicit domain scopes must be restored after the fallback.
+*/
+UPDATE f
+SET ScopeCode = N'Department'
+FROM dbo.F03Functions AS f
+WHERE f.FunctionCode = 2306;
+GO
+
 IF EXISTS (SELECT 1 FROM dbo.F03Functions GROUP BY FunctionKey HAVING COUNT(*) > 1)
     THROW 51460, N'F03Functions có FunctionKey trùng; cần xử lý trước khi tạo unique index.', 1;
 GO
