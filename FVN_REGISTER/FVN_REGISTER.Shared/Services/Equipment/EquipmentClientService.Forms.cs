@@ -15,7 +15,7 @@ public sealed partial class EquipmentClientService
         => Post<EquipmentFormAssignmentDto>("api/equipment/forms/assignments", request, "assign equipment form", ct);
 
     public Task<ApiResponse<bool>> RemoveEquipmentFormAssignmentAsync(int assignmentId, CancellationToken ct = default)
-        => Delete<bool>($"api/equipment/forms/assignments/{assignmentId}", "remove equipment form assignment", ct);
+        => Post<bool>($"api/equipment/forms/assignments/{assignmentId}/remove", new { }, "remove equipment form assignment", ct);
 
     public Task<ApiResponse<EquipmentFormSubmissionDto>> SubmitEquipmentFormAsync(EquipmentFormSubmissionRequest request, CancellationToken ct = default)
         => Post<EquipmentFormSubmissionDto>("api/equipment/forms/submit", request, "submit equipment form", ct);
