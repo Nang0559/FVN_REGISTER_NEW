@@ -47,7 +47,9 @@ public sealed class SecurityFunctionRegistryController : BaseApiController
     [HttpPost("web-manifest")]
     public async Task<IActionResult> PublishWebManifest([FromBody] WebSecurityManifestRequest request, CancellationToken ct)
     {
-        if (!await CanManageAsync(SecurityFunctionCodes.SecurityManageFunctions, ct)) return Forbid();
+        // Discovery is telemetry only. It must work for an authenticated user even when
+        // the function catalog has been emptied. It never grants or changes permissions.
+        if (UserInfo == null) return Unauthorized();
         if (request.Entries is null) return BadRequest(ApiResponse<object>.Fail("Danh sách chức năng giao diện không được để trống."));
         try
         {
@@ -192,7 +194,7 @@ public sealed class SecurityFunctionRegistryController : BaseApiController
         if (UserInfo == null) return false;
         if (await _authorization.HasAsync(UserInfo, functionCode, ct)) return true;
 
-        // Bootstrap path only protects the registry management surface.
+        // Bootstrap path only protects registry management surface.
         // It does not grant any business capability and is available only to SuperAdmin RoleCode/PermissionCode = 1.
         return functionCode is SecurityFunctionCodes.SecurityManageFunctions or SecurityFunctionCodes.SecurityManageRoles
             && await _registry.CanBootstrapRegistryAsync(UserInfo.UserId, ct);
