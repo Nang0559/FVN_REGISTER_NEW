@@ -23,10 +23,12 @@ public sealed class F03EquipmentAsset : BaseAuditEntity
     [StringLength(50)] public string? ResponsibleApproverEmployeeCode { get; set; }
     public DateTime? ResponsibleAssignedAt { get; set; }
 
-
     [StringLength(20)] public string? OperatingResponsibleDeptCode { get; set; }
     [StringLength(50)] public string? OperatingResponsibleEmployeeCode { get; set; }
     public DateTime? OperatingResponsibleAssignedAt { get; set; }
+
+    /// <summary>Schema/type key used to determine which employee request forms apply.</summary>
+    [StringLength(64)] public string? EquipmentSchemaKey { get; set; }
 
     // Flexible, department-specific attributes. The canonical fields above remain strongly typed.
     [Column(TypeName = "nvarchar(max)")]
