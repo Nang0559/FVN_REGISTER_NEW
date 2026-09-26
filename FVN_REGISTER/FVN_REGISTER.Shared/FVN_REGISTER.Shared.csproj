@@ -29,7 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Application\FVN_REGISTER.Application.csproj" />
-    <ProjectReference Include="..\..\FVN_REGISTER.Models\FVN_REGISTER.Contract.csproj" />
+    <ProjectReference Include="..\..\FVN_REGISTER.Contract\FVN_REGISTER.Contract.csproj" />
   </ItemGroup>
 
 </Project>
