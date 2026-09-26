@@ -4,8 +4,6 @@
 
 Tính năng quản lý endpoint Windows của FVN-REGISTER không phụ thuộc Active Directory, Domain Controller, LDAP hay tài khoản domain.
 
-Mô hình:
-
 ```text
 FVN Employee
     ↓
@@ -14,7 +12,7 @@ FVN Equipment Asset
 FVN Endpoint Device
     ↓
 FVN Windows Agent
-    ↓ HTTPS
+    ↓ HTTPS + credential riêng của máy
 FVN API
     ↓
 Software / Service Inventory
@@ -45,77 +43,82 @@ FVN tạo DeviceKey nội bộ. DeviceKey không được client tự chọn đ�
 
 Quy tắc nhận diện:
 1. Credential xác định endpoint mà server đã provision.
-2. DeviceKey lấy từ credential server-side.
+2. DeviceKey được lấy từ credential server-side.
 3. HardwareIdentity dùng để kiểm tra tính nhất quán.
 4. ComputerName chỉ là thuộc tính, không phải identity duy nhất.
 5. Nếu phần cứng identity thay đổi bất thường, chuyển trạng thái cần xác minh thay vì tự động đổi thiết bị.
 
 ## 3. Chuẩn bị server
 
-- Chạy SQL script theo thứ tự:
-  - `54_Endpoint_Inventory_Compliance.sql`
-  - `55_Endpoint_Credentials.sql`
-- Build API và Infrastructure.
-- HTTPS bắt buộc cho Agent production.
-- Chỉ mở API inventory từ mạng/phạm vi cần thiết.
-- Bật rate limiting.
-- Bật audit cho provision/rotate/revoke.
+Chạy SQL script theo thứ tự:
 
-Không lưu credential plaintext trong database.
+- `54_Endpoint_Inventory_Compliance.sql`
+- `55_Endpoint_Credentials.sql`
+
+Production yêu cầu:
+- HTTPS cho API inventory;
+- rate limiting theo endpoint;
+- audit provision/revoke/rotate;
+- credential lưu dạng SHA-256 hash, không lưu plaintext;
+- inventory endpoint xác thực bằng credential máy, không dùng JWT người dùng.
 
 ## 4. Provision một máy
 
 1. Tạo Equipment Asset nếu máy chưa có.
 2. Nhập serial/asset code và gán employee nếu có.
-3. Provision Endpoint cho Asset.
-4. FVN sinh credential riêng cho máy.
-5. Hiển thị secret đúng một lần.
-6. Cấu hình secret trên Agent.
-7. Cài Agent.
-8. Agent gửi heartbeat.
-9. Server xác nhận DeviceKey/HardwareIdentity.
-10. Agent gửi complete inventory.
+3. Provision Endpoint bằng API quản trị `POST /api/security/endpoints/credentials/provision`.
+4. FVN tạo DeviceKey nếu endpoint chưa tồn tại.
+5. FVN sinh credential ngẫu nhiên riêng cho máy và chỉ trả secret một lần.
+6. Không ghi secret vào log hoặc database.
+7. Bảo vệ secret trên Windows bằng DPAPI.
+8. Cài Agent.
+9. Agent gửi inventory qua `POST /api/security/endpoints/inventory`.
+10. Server lấy DeviceKey từ credential; không tin EmployeeCode/EquipmentAssetId/DeviceKey do Agent gửi.
 
-Nếu máy không có serial/SMBIOS UUID đáng tin cậy, vẫn cho Agent hoạt động nhưng đánh dấu identity quality thấp để IT xác minh.
+Credential hết hạn hoặc bị revoke phải làm request inventory thất bại.
 
 ## 5. Cài Windows Agent
 
 Agent chạy dưới Windows Service.
 
 Agent cần quyền đủ để đọc:
-- Installed Software từ Windows uninstall registry.
-- Windows Services.
-- Thông tin phần cứng/OS cơ bản.
+- Installed Software từ Windows uninstall registry;
+- Windows Services;
+- thông tin phần cứng/OS cơ bản.
 
 Không yêu cầu Domain Account.
 Không yêu cầu AD.
 Không yêu cầu remote WMI/SMB credential.
 Không chạy arbitrary PowerShell/CMD nhận từ server.
 
-Cấu hình tối thiểu:
+Cấu hình production:
 
 ```json
 {
-  "FvnEndpoint": {
+  "FVNEndpointAgent": {
     "ApiBaseUrl": "https://<fvn-api>",
     "DeviceKey": "<provisioned-device-key>",
-    "ApiKey": "<one-time-provisioned-secret>",
-    "CollectionIntervalMinutes": 30
+    "ApiKeyProtected": "<DPAPI-protected-secret>",
+    "IntervalMinutes": 30
   }
 }
 ```
 
-Trong production phải bảo vệ secret bằng Windows DPAPI/Windows Credential Manager hoặc cơ chế secret store phù hợp; không để plaintext trong source control.
+Agent dùng `WindowsSecretStore`/DPAPI với scope LocalMachine để giải mã credential. Không commit secret thật vào `appsettings.json`.
+
+Script cài đặt mẫu: `FVN_REGISTER.EndpointAgent/install-agent.ps1`.
 
 ## 6. Inventory
 
 Mỗi complete snapshot gồm:
-- Device metadata.
-- Software list.
-- Windows service list.
+- Device metadata;
+- Software list;
+- Windows service list;
 - Collection timestamp.
 
-Server upsert theo DeviceKey server-side và thay thế snapshot hiện hành một cách transaction-safe. Dữ liệu lịch sử compliance được giữ riêng; inventory hiện hành không được phình lên theo từng lần heartbeat.
+Server upsert theo DeviceKey server-side và thay thế snapshot hiện hành transaction-safe. Dữ liệu lịch sử compliance được giữ riêng; inventory hiện hành không phình theo từng heartbeat.
+
+`EmployeeCode` và `EquipmentAssetId` trong payload Agent không được dùng làm quyền sở hữu. Quan hệ Employee ↔ Equipment do FVN quản lý.
 
 ## 7. Policy
 
@@ -150,7 +153,7 @@ Kết quả:
 - `AgentOffline`: quá thời gian heartbeat.
 - `UnmanagedDevice`: phát hiện thiết bị nhưng chưa được FVN provision.
 
-Không chuyển `Unknown` thành `NonCompliant` một cách tự động.
+Không chuyển `Unknown` thành `NonCompliant` tự động.
 
 Exception được xét trước khi tạo vi phạm:
 
@@ -162,17 +165,15 @@ Policy Deny
 
 ## 9. Alert
 
-Alert phải idempotent. Một vi phạm lặp lại ở các lần inventory không tạo hàng nghìn alert mới.
+Alert phải idempotent. Một vi phạm lặp lại không tạo hàng nghìn alert mới.
 
-Một alert được mở, cập nhật LastDetectedAt và chỉ đóng khi:
-- inventory mới chứng minh đã hết vi phạm; hoặc
-- người có quyền xử lý đóng theo quy trình.
+Một alert được mở, cập nhật LastDetectedAt và chỉ đóng khi inventory chứng minh đã hết vi phạm hoặc người có quyền xử lý đóng theo quy trình.
 
 ## 10. Exception và Approval
 
 Không tạo Approval Engine mới.
 
-Exception sử dụng Approval Engine hiện tại và phải snapshot:
+Exception sử dụng Approval Engine hiện tại và snapshot:
 - thiết bị;
 - software/service;
 - policy;
@@ -210,17 +211,18 @@ Không để Defender thay thế FVN DeviceKey.
 ## 13. Kiểm thử bắt buộc trước production
 
 ### Identity
-- Hai máy không được dùng chung credential.
+- Hai máy không dùng chung credential.
 - Revoke credential phải chặn inventory.
-- Credential của PC-A không được gửi inventory cho PC-B.
-- Đổi ComputerName không tạo endpoint mới nếu identity phần cứng/credential vẫn hợp lệ.
-- Credential hết hạn phải bị từ chối.
+- Credential của PC-A không gửi inventory cho PC-B.
+- Đổi ComputerName không tạo endpoint mới nếu credential/hardware identity vẫn hợp lệ.
+- Credential hết hạn bị từ chối.
+- Payload sửa DeviceKey nhưng giữ credential của máy khác vẫn bị server quy về DeviceKey của credential.
 
 ### Inventory
 - Cùng snapshot gửi hai lần không tạo duplicate.
-- Software gỡ khỏi máy phải biến mất khỏi current inventory.
-- Service thay đổi state phải cập nhật.
-- Inventory lỗi giữa chừng không được xóa snapshot hợp lệ trước đó.
+- Software gỡ khỏi máy biến mất khỏi current inventory.
+- Service thay đổi state được cập nhật.
+- Inventory lỗi giữa chừng không xóa snapshot hợp lệ trước đó.
 
 ### Compliance
 - Allow → Compliant.
@@ -235,6 +237,7 @@ Không để Defender thay thế FVN DeviceKey.
 - Audit provision/revoke.
 - Secret không xuất hiện trong log.
 - Agent không có remote command channel.
+- API inventory không yêu cầu JWT người dùng.
 
 ## 14. Rollout đề xuất
 
