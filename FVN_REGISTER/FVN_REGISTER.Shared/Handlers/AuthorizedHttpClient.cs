@@ -127,8 +127,13 @@ namespace FVN_REGISTER.Shared.Handlers
                 };
             }
 
-            var apiResult = TryDeserialize<ApiResponse<T>>(content);
-            if (apiResult != null) return apiResult;
+            var trimmed = content.TrimStart();
+            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+            {
+                var apiResult = TryDeserialize<ApiResponse<T>>(content);
+                if (apiResult != null) return apiResult;
+            }
+
             var raw = TryDeserialize<T>(content);
             if (raw != null) return ApiResponse<T>.Ok(raw);
             return ApiResponse<T>.Fail("Invalid response format.");
