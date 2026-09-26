@@ -1,9 +1,10 @@
 using FVN_REGISTER.Application.Interfaces.Security;
+using FVN_REGISTER.Application.Interfaces.Users;
 using FVN_REGISTER.Contract.Dtos.Security;
 using FVN_REGISTER.Contract.Responses;
 using FVN_REGISTER.Core.Constants;
-using FVN_REGISTER.Application.Interfaces.Users;
-using AppAuthorizationService = FVN_REGISTER.Application.Interfaces.Security.IAuthorizationService;
+using FVN_REGISTER.Infrastructure;
+using FVN_REGISTER.Infrastructure.Services.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,13 +15,13 @@ namespace FVN_REGISTER.API.Controllers;
 [Authorize]
 public sealed class EndpointInventoryController : ControllerBase
 {
-    private readonly IEndpointInventoryService _service;
+    private readonly EndpointInventoryService _service;
     private readonly ICurrentUserService _currentUser;
-    private readonly AppAuthorizationService _authorization;
+    private readonly IAuthorizationService _authorization;
 
-    public EndpointInventoryController(IEndpointInventoryService service, ICurrentUserService currentUser, AppAuthorizationService authorization)
+    public EndpointInventoryController(FVNWEBAPPContext db, ICurrentUserService currentUser, IAuthorizationService authorization)
     {
-        _service = service;
+        _service = new EndpointInventoryService(db);
         _currentUser = currentUser;
         _authorization = authorization;
     }
@@ -31,7 +32,7 @@ public sealed class EndpointInventoryController : ControllerBase
         var user = _currentUser.GetCurrentUser();
         if (user == null || !await _authorization.HasAsync(user, SecurityFunctionCodes.EquipmentView, ct)) return Forbid();
         var data = await _service.GetAllAsync(ct);
-        return Ok(ApiResponse<IReadOnlyList<EndpointInventorySummaryDto>>.Success(data));
+        return Ok(ApiResponse<IReadOnlyList<EndpointInventorySummaryDto>>.Ok(data));
     }
 
     [HttpGet("{deviceKey}")]
@@ -40,12 +41,11 @@ public sealed class EndpointInventoryController : ControllerBase
         var user = _currentUser.GetCurrentUser();
         if (user == null || !await _authorization.HasAsync(user, SecurityFunctionCodes.EquipmentView, ct)) return Forbid();
         var data = await _service.GetAsync(deviceKey, ct);
-        return data == null ? NotFound(ApiResponse<EndpointInventorySummaryDto>.Fail("Không tìm thấy máy.")) : Ok(ApiResponse<EndpointInventorySummaryDto>.Success(data));
+        return data == null ? NotFound(ApiResponse<EndpointInventorySummaryDto>.Fail("Không tìm thấy máy.", 404)) : Ok(ApiResponse<EndpointInventorySummaryDto>.Ok(data));
     }
 
-    // Authenticated ingestion endpoint for the initial rollout/testing phase.
-    // A dedicated per-device credential endpoint must be introduced before deploying
-    // the Windows Agent broadly; do not use a shared secret across all endpoints.
+    // Authenticated ingestion endpoint for initial rollout/testing. A dedicated
+    // per-device credential endpoint must be used before broad Agent deployment.
     [HttpPost("inventory")]
     public async Task<ActionResult<ApiResponse<EndpointInventorySummaryDto>>> Ingest([FromBody] EndpointInventoryRequestDto request, CancellationToken ct)
     {
@@ -54,7 +54,7 @@ public sealed class EndpointInventoryController : ControllerBase
         try
         {
             var result = await _service.UpsertInventoryAsync(request, ct);
-            return Ok(ApiResponse<EndpointInventorySummaryDto>.Success(result));
+            return Ok(ApiResponse<EndpointInventorySummaryDto>.Ok(result));
         }
         catch (ArgumentException ex)
         {
