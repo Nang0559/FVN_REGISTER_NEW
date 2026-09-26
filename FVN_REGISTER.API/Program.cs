@@ -46,7 +46,7 @@ using FVN_REGISTER.Infrastructure.Services.Common;
 using FVN_REGISTER.Infrastructure.Services.Emails;
 using FVN_REGISTER.Infrastructure.Services.Employees;
 using FVN_REGISTER.Infrastructure.Services.Equipment;
-using FVN_REGISTER.Infrastructure.Services.FeatureOperators;
+using FVN_REGISTER.Infrastructure.Services.Security;
 using FVN_REGISTER.Infrastructure.Services.Histories;
 using FVN_REGISTER.Infrastructure.Services.HrmSync;
 using FVN_REGISTER.Infrastructure.Services.HrmSync.ManualSync.Importers;
