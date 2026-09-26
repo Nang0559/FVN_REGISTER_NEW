@@ -1,5 +1,24 @@
 namespace FVN_REGISTER.Contract.Dtos.EquipmentForms;
 
+public sealed class EquipmentFormQuestionOptionDto
+{
+    public string OptionCode { get; set; } = string.Empty;
+    public string OptionText { get; set; } = string.Empty;
+}
+
+public sealed class EquipmentFormQuestionDto
+{
+    public int Id { get; set; }
+    public string QuestionCode { get; set; } = string.Empty;
+    public string QuestionText { get; set; } = string.Empty;
+    public string QuestionType { get; set; } = "Text";
+    public string? HelpText { get; set; }
+    public string? Placeholder { get; set; }
+    public bool IsRequired { get; set; }
+    public int Sequence { get; set; }
+    public List<EquipmentFormQuestionOptionDto> Options { get; set; } = new();
+}
+
 public sealed class EquipmentApplicableFormDto
 {
     public int FormId { get; set; }
@@ -13,6 +32,7 @@ public sealed class EquipmentApplicableFormDto
     public int AssetId { get; set; }
     public string EquipmentCode { get; set; } = string.Empty;
     public string EquipmentName { get; set; } = string.Empty;
+    public List<EquipmentFormQuestionDto> Questions { get; set; } = new();
 }
 
 public sealed class EquipmentFormAssignmentDto
