@@ -9,7 +9,7 @@ using System.Net.Http.Headers;
 
 namespace FVN_REGISTER.Shared.Services.Equipment;
 
-public sealed class EquipmentClientService : IEquipmentClientService
+public sealed partial class EquipmentClientService : IEquipmentClientService
 {
     private readonly IHttpClientWithAuth _http;
     private readonly ILogger<EquipmentClientService> _logger;
