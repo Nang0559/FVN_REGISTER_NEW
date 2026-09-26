@@ -246,9 +246,11 @@ public sealed class SecurityController : BaseApiController
 
     private async Task<bool> CanManageTwoFactorAsync(CancellationToken ct)
     {
+        // 2FA administration is a SuperAdmin-only security operation.
+        // The 2407 function remains part of the RBAC catalog for visibility/audit,
+        // but a stale/missing RoleFunction row must not lock the SuperAdmin out.
         return UserInfo != null
-            && UserInfo.Permission == UserPermissionCodes.SuperAdmin
-            && await _authorization.HasAsync(UserInfo, SecurityFunctionCodes.UserManagementManageTwoFactor, ct);
+            && UserInfo.Permission == UserPermissionCodes.SuperAdmin;
     }
 
     private async Task<bool> CanManageAsync(int functionCode, CancellationToken ct)
