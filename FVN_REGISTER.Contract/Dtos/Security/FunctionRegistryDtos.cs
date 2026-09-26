@@ -58,4 +58,8 @@ public sealed record SecurityRoleDto(
     string RoleName,
     string? Detail,
     bool IsSystem,
-    bool IsActive);
+    bool IsActive)
+{
+    public int IdRole => Id;
+    public List<int> FunctionCodes { get; init; } = new();
+}
