@@ -16,49 +16,25 @@ public sealed class ApprovalBuildContext
     public int Year => Extra.TryGetValue("Year", out var v) && v is int i ? i : DateTime.Today.Year;
     public string LeaveTypeCode => Extra.TryGetValue("LeaveTypeCode", out var v) && v is string s ? s : "";
 
-    public static ApprovalBuildContext ForOT(
-        int requestId,
-        string employeeCode,
-        string deptCode,
-        string positionCode,
-        decimal totalOTHours,
-        string otTypeCode) => new()
+    public static ApprovalBuildContext ForOT(int requestId, string employeeCode, string deptCode, string positionCode, decimal totalOTHours, string otTypeCode) => new()
     {
         RequestId = requestId,
         EmployeeCode = employeeCode,
         DeptCode = deptCode,
         PositionCode = positionCode,
-        Extra = new Dictionary<string, object?>
-        {
-            ["TotalOTHours"] = totalOTHours,
-            ["OTTypeCode"] = otTypeCode
-        }
+        Extra = new Dictionary<string, object?> { ["TotalOTHours"] = totalOTHours, ["OTTypeCode"] = otTypeCode }
     };
 
-    public static ApprovalBuildContext ForLeave(
-        int requestId,
-        string employeeCode,
-        string deptCode,
-        string positionCode,
-        int? year = null,
-        string? leaveTypeCode = null) => new()
+    public static ApprovalBuildContext ForLeave(int requestId, string employeeCode, string deptCode, string positionCode, int? year = null, string? leaveTypeCode = null) => new()
     {
         RequestId = requestId,
         EmployeeCode = employeeCode,
         DeptCode = deptCode,
         PositionCode = positionCode,
-        Extra = new Dictionary<string, object?>
-        {
-            ["Year"] = year ?? DateTime.Today.Year,
-            ["LeaveTypeCode"] = leaveTypeCode ?? ""
-        }
+        Extra = new Dictionary<string, object?> { ["Year"] = year ?? DateTime.Today.Year, ["LeaveTypeCode"] = leaveTypeCode ?? "" }
     };
 
-    public static ApprovalBuildContext ForTrip(
-        int requestId,
-        string employeeCode,
-        string deptCode,
-        string positionCode) => new()
+    public static ApprovalBuildContext ForTrip(int requestId, string employeeCode, string deptCode, string positionCode) => new()
     {
         RequestId = requestId,
         EmployeeCode = employeeCode,
@@ -66,13 +42,22 @@ public sealed class ApprovalBuildContext
         PositionCode = positionCode
     };
 
-    public static ApprovalBuildContext ForEquipment(
-        int requestId,
-        string employeeCode,
-        string deptCode,
-        string positionCode) => new()
+    public static ApprovalBuildContext ForEquipment(int requestId, string employeeCode, string deptCode, string positionCode) => new()
     {
         RequestId = requestId,
+        EmployeeCode = employeeCode,
+        DeptCode = deptCode,
+        PositionCode = positionCode
+    };
+
+    /// <summary>
+    /// Period-level approval still uses the existing HRM PositionCode -> policy -> approver
+    /// route. The employee is the operator who created/finalized the period; the period itself
+    /// remains the approval subject. This avoids inventing a second routing mechanism.
+    /// </summary>
+    public static ApprovalBuildContext ForPayrollPeriod(int periodId, string employeeCode, string deptCode, string positionCode) => new()
+    {
+        RequestId = periodId,
         EmployeeCode = employeeCode,
         DeptCode = deptCode,
         PositionCode = positionCode
