@@ -564,9 +564,11 @@
     private bool _savingTwoFactor;
     private const int ManageTwoFactorFunctionCode = 2407;
 
+    // 2FA administration is explicitly restricted to SuperAdmin.
+    // Do not depend on the 2407 RoleFunction row here; older databases may
+    // still be missing that compatibility grant while the account is SuperAdmin.
     private bool CanManageTwoFactor
-        => _myPermissions?.PermissionCode == UserPermissionCodes.SuperAdmin
-           && _myPermissions.Has(ManageTwoFactorFunctionCode);
+        => _myPermissions?.PermissionCode == UserPermissionCodes.SuperAdmin;
 
     private IEnumerable<TwoFactorAdminUserDto> FilteredTwoFactorUsers =>
         string.IsNullOrWhiteSpace(_twoFactorSearch)
