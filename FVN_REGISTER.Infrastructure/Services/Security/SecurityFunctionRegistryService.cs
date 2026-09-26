@@ -54,6 +54,7 @@ public sealed class SecurityFunctionRegistryService
                     DefinitionHash = d.DefinitionHash, FirstDiscoveredAt = now, LastSeenAt = now
                 };
                 _db.SecurityFunctionRegistry.Add(item); registryByKey[d.FunctionKey] = item;
+                if (item.LifecycleStatus == "Active") matched++;
             }
             else
             {
