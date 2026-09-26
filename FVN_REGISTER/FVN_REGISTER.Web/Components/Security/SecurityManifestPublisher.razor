@@ -23,7 +23,7 @@
         await PublishIfAuthorizedAsync();
     }
 
-    private void OnAuthenticationStateChanged(Task<AuthenticationState> _)
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
     {
         _published = false;
         _ = InvokeAsync(async () =>
