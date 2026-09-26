@@ -9,7 +9,9 @@ using FVN_REGISTER.Infrastructure.Services.Security;
 using FVN_REGISTER.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 
 namespace FVN_REGISTER.API.Controllers;
 
@@ -21,11 +23,14 @@ public sealed class SecurityFunctionRegistryController : BaseApiController
     private readonly SecurityFunctionRegistryService _registry;
     private readonly SecurityWebManifestService _webManifest;
     private readonly AppAuthorizationService _authorization;
+    private readonly FVNWEBAPPContext _db;
+    private readonly IEnumerable<EndpointDataSource> _endpointSources;
 
     public SecurityFunctionRegistryController(
         SecurityFunctionRegistryService registry,
         FVNWEBAPPContext db,
         AppAuthorizationService authorization,
+        IEnumerable<EndpointDataSource> endpointSources,
         ICurrentUserService currentUser,
         IUserLogService userLog,
         ILogger<SecurityFunctionRegistryController> logger,
@@ -35,13 +40,34 @@ public sealed class SecurityFunctionRegistryController : BaseApiController
         _registry = registry;
         _webManifest = new SecurityWebManifestService(db);
         _authorization = authorization;
+        _db = db;
+        _endpointSources = endpointSources;
     }
 
     [HttpPost("scan")]
     public async Task<IActionResult> Scan(CancellationToken ct)
     {
         if (!await CanManageAsync(SecurityFunctionCodes.SecurityManageFunctions, ct)) return Forbid();
-        return Ok(ApiResponse<SecurityFunctionDiscoverySummaryDto>.Ok(await _registry.ReconcileAsync(ct)));
+
+        var definitionResult = await _registry.ReconcileAsync(ct);
+        var candidateDiscovery = new SecurityCandidateDiscovery(_db, _endpointSources);
+        var candidateCount = await candidateDiscovery.ScanAsync(ct);
+        var now = DateTime.Now;
+
+        var pendingRegistration = await _db.SecurityFunctionRegistry.CountAsync(x => x.LifecycleStatus == "PendingRegistration" && !x.IsIgnored, ct);
+        var pendingRetirement = await _db.SecurityFunctionRegistry.CountAsync(x => x.LifecycleStatus == "PendingRetirement", ct);
+        var conflicts = await _db.SecurityFunctionRegistry.CountAsync(x => x.LifecycleStatus == "Conflict", ct);
+        var matched = await _db.SecurityFunctionRegistry.CountAsync(x => x.LifecycleStatus == "Active", ct);
+
+        var summary = new SecurityFunctionDiscoverySummaryDto(
+            now,
+            definitionResult.Discovered + candidateCount,
+            matched,
+            pendingRegistration,
+            pendingRetirement,
+            conflicts);
+
+        return Ok(ApiResponse<SecurityFunctionDiscoverySummaryDto>.Ok(summary));
     }
 
     [HttpPost("web-manifest")]
