@@ -472,6 +472,10 @@ public sealed class AuthorizationService : BaseService<AuthorizationService>, IA
             return new PermissionSnapshotDto
             {
                 UserId = userId,
+                PermissionCode = await _uow.Repository<F03User>().Query()
+                    .Where(x => x.Id == userId)
+                    .Select(x => (int?)x.PermissionCode)
+                    .FirstOrDefaultAsync(ct),
                 RoleCodes = new List<int>(),
                 Functions = new List<SecurityFunctionDto>(),
                 FunctionCodes = new HashSet<int>()
@@ -539,6 +543,7 @@ public sealed class AuthorizationService : BaseService<AuthorizationService>, IA
         return new PermissionSnapshotDto
         {
             UserId = userId,
+            PermissionCode = legacyRole,
             RoleCodes = roleCodes,
             Functions = functions,
             FunctionCodes = functions.Select(x => x.FunctionCode).ToHashSet()
