@@ -1,0 +1,144 @@
+@page "/equipment/form-management"
+@attribute [Authorize]
+@using FVN_REGISTER.Contract.Dtos.Equipment
+@using FVN_REGISTER.Contract.Dtos.EquipmentForms
+@using FVN_REGISTER.Contract.Dtos.PublicForms
+@using FVN_REGISTER.Shared.Services.Equipment
+@using Microsoft.AspNetCore.Authorization
+@inherits AppComponentBase
+@inject IEquipmentClientService EquipmentClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+    <MudStack Spacing="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <div>
+                <MudText Typo="Typo.h5">Biểu mẫu áp dụng theo loại thiết bị</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Biểu mẫu được tạo bằng chức năng Biểu mẫu chung. Màn hình này chỉ quyết định loại thiết bị nào được sử dụng biểu mẫu nào.</MudText>
+            </div>
+            <MudButton Variant="Variant.Text" OnClick="@(() => Navigation.NavigateTo("/equipment"))">Quay lại</MudButton>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3">
+                        <MudText Typo="Typo.subtitle1">Loại / schema thiết bị</MudText>
+                        @foreach (var schema in _schemas.Where(x => x.IsActive).OrderBy(x => x.DeptCode).ThenBy(x => x.SchemaName))
+                        {
+                            <MudButton FullWidth="true" Variant="@(schema.Id == _selectedSchemaId ? Variant.Filled : Variant.Text)" Class="justify-start mt-1" OnClick="@(() => SelectSchemaAsync(schema))">
+                                @schema.DeptCode — @schema.SchemaName — v@schema.Version
+                            </MudButton>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    @if (_selectedSchemaId.HasValue)
+                    {
+                        <MudPaper Class="pa-4">
+                            <MudText Typo="Typo.h6">Biểu mẫu đang áp dụng</MudText>
+                            <MudText Typo="Typo.caption">Schema: @_selectedSchemaName</MudText>
+                            <MudDivider Class="my-3" />
+                            @if (_assignments.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info">Chưa có biểu mẫu nào được gán cho loại thiết bị này.</MudAlert>
+                            }
+                            else
+                            {
+                                @foreach (var assignment in _assignments.Where(x => x.IsActiveAssignment))
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                                        <MudText>@assignment.FormCode — @assignment.FormTitle</MudText>
+                                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoveAsync(assignment.Id))">Ngừng áp dụng</MudButton>
+                                    </MudStack>
+                                }
+                            }
+                            <MudDivider Class="my-3" />
+                            <MudText Typo="Typo.subtitle2">Thêm biểu mẫu</MudText>
+                            <MudSelect T="int" @bind-Value="_selectedFormId" Label="Biểu mẫu đã phát hành" Variant="Variant.Outlined" Class="mt-2">
+                                @foreach (var form in _catalog.Where(x => x.IsActive && string.Equals(x.Status, "Published", StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    <MudSelectItem Value="@form.Id">@form.FormCode — @form.Title</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudNumericField @bind-Value="_displayOrder" Label="Thứ tự hiển thị" Min="0" Class="mt-2" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" Disabled="@(_selectedFormId <= 0)" OnClick="AssignAsync">Áp dụng cho loại thiết bị</MudButton>
+                        </MudPaper>
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<EquipmentSchemaSummaryDto> _schemas = new();
+    private List<EquipmentFormAssignmentDto> _assignments = new();
+    private List<PublicFormDto> _catalog = new();
+    private int? _selectedSchemaId;
+    private string _selectedSchemaName = string.Empty;
+    private int _selectedFormId;
+    private int _displayOrder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var schemas = await EquipmentClient.GetSchemasAsync();
+        var forms = await EquipmentClient.GetEquipmentFormCatalogAsync();
+        if (!schemas.IsSuccess || !forms.IsSuccess)
+        {
+            Snackbar.Add(schemas.Message ?? forms.Message ?? "Bạn không có quyền quản lý biểu mẫu thiết bị.", Severity.Error);
+            _loading = false;
+            return;
+        }
+        _schemas = schemas.Data ?? new();
+        _catalog = forms.Data ?? new();
+        var first = _schemas.FirstOrDefault(x => x.IsActive);
+        if (first != null) await SelectSchemaAsync(first);
+        _loading = false;
+    }
+
+    private async Task SelectSchemaAsync(EquipmentSchemaSummaryDto schema)
+    {
+        _selectedSchemaId = schema.Id;
+        _selectedSchemaName = $"{schema.DeptCode} — {schema.SchemaName} — v{schema.Version}";
+        var result = await EquipmentClient.GetEquipmentFormAssignmentsAsync(schema.SchemaKey);
+        _assignments = result.IsSuccess ? result.Data ?? new() : new();
+    }
+
+    private async Task AssignAsync()
+    {
+        if (!_selectedSchemaId.HasValue || _selectedFormId <= 0) return;
+        var schema = _schemas.FirstOrDefault(x => x.Id == _selectedSchemaId.Value);
+        if (schema == null) return;
+        var result = await EquipmentClient.AssignEquipmentFormAsync(new EquipmentFormAssignmentRequest { EquipmentSchemaKey = schema.SchemaKey, FormId = _selectedFormId, DisplayOrder = _displayOrder });
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Đã áp dụng biểu mẫu cho loại thiết bị.", Severity.Success);
+            await SelectSchemaAsync(schema);
+        }
+        else Snackbar.Add(result.Message ?? "Không thể áp dụng biểu mẫu.", Severity.Error);
+    }
+
+    private async Task RemoveAsync(int assignmentId)
+    {
+        var result = await EquipmentClient.RemoveEquipmentFormAssignmentAsync(assignmentId);
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Đã ngừng áp dụng biểu mẫu.", Severity.Success);
+            if (_selectedSchemaId.HasValue)
+            {
+                var schema = _schemas.FirstOrDefault(x => x.Id == _selectedSchemaId.Value);
+                if (schema != null) await SelectSchemaAsync(schema);
+            }
+        }
+        else Snackbar.Add(result.Message ?? "Không thể ngừng áp dụng biểu mẫu.", Severity.Error);
+    }
+}
