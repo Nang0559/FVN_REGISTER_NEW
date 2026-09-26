@@ -17,5 +17,11 @@ public sealed class F03EquipmentImportBatchConfiguration : IEntityTypeConfigurat
         b.Property(x => x.IsActive).HasDefaultValue(true);
         b.Property(x => x.CreatedAt).HasColumnType("datetime2(0)");
         b.Property(x => x.ModifiedAt).HasColumnType("datetime2(0)");
+        b.HasOne(x => x.Schema)
+            .WithMany()
+            .HasForeignKey(x => x.SchemaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.DeptCode, x.SchemaId, x.Status })
+            .HasDatabaseName("IX_F03EquipmentImportBatches_Dept_Schema_Status");
     }
 }
