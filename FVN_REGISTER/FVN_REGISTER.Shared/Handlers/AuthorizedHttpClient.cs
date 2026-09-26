@@ -110,7 +110,21 @@ namespace FVN_REGISTER.Shared.Handlers
                     errorResponse.IsSuccess = false; errorResponse.StatusCode = (int)response.StatusCode; errorResponse.IsUnauthorized = isUnauthorized;
                     if (!string.IsNullOrWhiteSpace(errorResponse.Message)) return errorResponse;
                 }
-                return new ApiResponse<T> { IsSuccess = false, StatusCode = (int)response.StatusCode, Message = string.IsNullOrWhiteSpace(content) ? "Server request failed." : content, IsUnauthorized = isUnauthorized };
+                var fallbackMessage = response.StatusCode switch
+                {
+                    HttpStatusCode.Forbidden => "Bạn không có quyền thực hiện thao tác này.",
+                    HttpStatusCode.Unauthorized => "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.",
+                    HttpStatusCode.NotFound => "Không tìm thấy tài nguyên yêu cầu.",
+                    _ => string.IsNullOrWhiteSpace(content) ? "Server request failed." : content
+                };
+
+                return new ApiResponse<T>
+                {
+                    IsSuccess = false,
+                    StatusCode = (int)response.StatusCode,
+                    Message = fallbackMessage,
+                    IsUnauthorized = isUnauthorized
+                };
             }
 
             var apiResult = TryDeserialize<ApiResponse<T>>(content);
